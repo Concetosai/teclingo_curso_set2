@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import './index.css'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 import UnscrambleExercise from './components/UnscrambleExercise'
 import WritingRulesPanel from './components/WritingRulesPanel'
 import LibraryPanel from './components/LibraryPanel'

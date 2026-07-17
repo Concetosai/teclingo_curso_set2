@@ -1,10 +1,14 @@
 node_modules/
 .env
 .env.local
+# .env.production se sube (solo tiene VITE_API_URL vacío)
 *.local
 dist/
 dist-ssr/
-backend/__pycache__/
-backend/*.pyc
+__pycache__/
+*.pyc
+*.pyo
 *.log
 .DS_Store
+.vscode/
+.idea/

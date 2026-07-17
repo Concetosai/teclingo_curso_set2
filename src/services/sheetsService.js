@@ -1,4 +1,4 @@
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyiHRrm7GwreoDZOCbdVrk2CZctYaSumUq4eV8iKcYzkBORnCdTAJ5InqHpqJKD4wmBNw/exec';
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbz_aCE0YmQvfCB3tLJkB7g5KXt-fev72I2vWRBk2wSOsDlC6GtNo0JGHX-1sO2X-lX8lg/exec';
 
 function getUserEmail() {
   try {

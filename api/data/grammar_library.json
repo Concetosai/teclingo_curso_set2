@@ -1,0 +1,290 @@
+{
+  "level": "A1",
+  "cefr_reference": "Common European Framework of Reference for Languages",
+  "description": "Gramática fundamental del nivel A1. Reglas esenciales para construir oraciones simples y comunicar necesidades básicas.",
+  "rules": [
+    {
+      "rule_id": "GR-TOBE-AFF",
+      "title": "El verbo 'To Be' (Afirmativo)",
+      "category": "Verbos",
+      "subtopic_ids": ["A1-M01-ST01"],
+      "rule": "El verbo 'to be' se conjuga según el sujeto: I am, You are, He/She/It is, We/They are.",
+      "structure": "Sujeto + am/is/are + complemento",
+      "examples": [
+        {"en": "I am a student.", "es": "Soy estudiante."},
+        {"en": "She is happy.", "es": "Ella está feliz."},
+        {"en": "They are from Mexico.", "es": "Ellos son de México."}
+      ],
+      "tips": [
+        "I siempre va con 'am'",
+        "He/She/It va con 'is'",
+        "You/We/They van con 'are'",
+        "Nunca olvides el sujeto: 'Is happy' está incompleto, di 'She is happy'"
+      ],
+      "common_mistakes": [
+        {"wrong": "I is a student.", "right": "I am a student.", "why": "I siempre se conjug con 'am', nunca con 'is'."},
+        {"wrong": "He are happy.", "right": "He is happy.", "why": "He/She/It siempre van con 'is'."}
+      ]
+    },
+    {
+      "rule_id": "GR-TOBE-NEG",
+      "title": "El verbo 'To Be' (Negativo y Preguntas)",
+      "category": "Verbos",
+      "subtopic_ids": ["A1-M01-ST02"],
+      "rule": "Para hacer negativas, agrega 'not' después del verbo. Para preguntas, invierte sujeto y verbo.",
+      "structure": "Negativa: Sujeto + am/is/are + not + complemento\nPregunta: Am/Is/Are + sujeto + complemento?",
+      "examples": [
+        {"en": "I am not a teacher.", "es": "No soy profesor."},
+        {"en": "She isn't happy.", "es": "Ella no está feliz."},
+        {"en": "Are you from Mexico?", "es": "¿Eres de México?"},
+        {"en": "Is he a student?", "es": "¿Él es estudiante?"}
+      ],
+      "tips": [
+        "Las formas contractas: isn't = is not, aren't = are not",
+        "En preguntas, el verbo va ANTES del sujeto",
+        "Las preguntas de sí/no se responden con Yes o No"
+      ],
+      "common_mistakes": [
+        {"wrong": "I no am a teacher.", "right": "I am not a teacher.", "why": "'Not' va DESPUÉS del verbo to be, no antes."},
+        {"wrong": "You is not?", "right": "Are you...?", "why": "En preguntas, invierte sujeto y verbo: Are you...?"}
+      ]
+    },
+    {
+      "rule_id": "GR-WH-QUESTIONS",
+      "title": "Preguntas Wh- y Adjetivos Posesivos",
+      "category": "Estructura de oraciones",
+      "subtopic_ids": ["A1-M01-ST03"],
+      "rule": "Las preguntas Wh- usan: What, Where, Who, When, Why, How. Los adjetivos posesivos indican pertenencia.",
+      "structure": "Wh- + am/is/are + sujeto + complemento?\nAdjetivo posesivo + sustantivo",
+      "examples": [
+        {"en": "Where are you from?", "es": "¿De dónde eres?"},
+        {"en": "What is your name?", "es": "¿Cómo te llamas?"},
+        {"en": "My name is Carlos.", "es": "Mi nombre es Carlos."},
+        {"en": "Her phone is red.", "es": "Su teléfono es rojo."}
+      ],
+      "tips": [
+        "What = qué, Where = dónde, Who = quién, When = cuándo, Why = por qué, How = cómo",
+        "Posesivos: my (mi), your (tu), his (su de él), her (su de ella), its (su de ello), our (nuestro), their (su de ellos)"
+      ],
+      "common_mistakes": [
+        {"wrong": "Where you are from?", "right": "Where are you from?", "why": "En preguntas Wh-, el verbo va después de la palabra interrogativa."},
+        {"wrong": "Is my phone.", "right": "My phone is red.", "why": "El posesivo va antes del sustantivo, y la oración necesita verbo."}
+      ]
+    },
+    {
+      "rule_id": "GR-ARTICLES",
+      "title": "Sustantivos Plurales y Artículos (a/an/the)",
+      "category": "Sustantivos",
+      "subtopic_ids": ["A1-M01-ST04"],
+      "rule": "Los sustantivos en plural se forman generalmente agregando -s/-es. 'A' se usa antes de consonantes, 'an' antes de vocales, 'the' para cosas específicas.",
+      "structure": "Sustantivo + s/es (plural)\na/an + sustantivo (indefinido)\nthe + sustantivo (definido)",
+      "examples": [
+        {"en": "A book / An apple / The teacher", "es": "Un libro / Una manzana / El profesor"},
+        {"en": "I have two books.", "es": "Tengo dos libros."},
+        {"en": "She is a doctor.", "es": "Ella es doctora."},
+        {"en": "The sun is hot.", "es": "El sol está caliente."}
+      ],
+      "tips": [
+        "Usa 'a' antes de sonidos de consonante: a car, a university (suena como 'y')",
+        "Usa 'an' antes de sonidos de vocal: an egg, an hour (la h es muda)",
+        "Usa 'the' cuando ambos saben de qué hablas: the book on the table",
+        "Plurales irregulares: man→men, woman→women, child→children, tooth→teeth"
+      ],
+      "common_mistakes": [
+        {"wrong": "I have a books.", "right": "I have books. / I have a book.", "why": "No puedes usar 'a' con un sustantivo en plural."},
+        {"wrong": "She is an doctor.", "right": "She is a doctor.", "why": "'Doctor' empieza con sonido de consonante, usa 'a'."}
+      ]
+    },
+    {
+      "rule_id": "GR-PRESENT-AFF",
+      "title": "Present Simple (Afirmativo)",
+      "category": "Tiempos verbales",
+      "subtopic_ids": ["A1-M01-ST05"],
+      "rule": "El Present Simple describe hábitos, rutinas y hechos. Se forma con el verbo base, y se agrega -s/-es en tercera persona.",
+      "structure": "Sujeto + verbo base (+ s/es en he/she/it)",
+      "examples": [
+        {"en": "I work every day.", "es": "Trabajo todos los días."},
+        {"en": "She works at a hospital.", "es": "Ella trabaja en un hospital."},
+        {"en": "They play soccer.", "es": "Ellos juegan fútbol."},
+        {"en": "He watches TV.", "es": "Él ve televisión."}
+      ],
+      "tips": [
+        "Se usa con: always, usually, sometimes, never, every day",
+        "Verbos regulares: agregar -s (works), -es (watches, goes), -ies (studies)",
+        "Verbos irregulares: have→has, do→does",
+        "Para he/she/it: agrega -s o usa does en preguntas/negativas"
+      ],
+      "common_mistakes": [
+        {"wrong": "She work at a hospital.", "right": "She works at a hospital.", "why": "En tercera persona (he/she/it), el verbo lleva -s."},
+        {"wrong": "He don't watches TV.", "right": "He doesn't watch TV.", "why": "Con doesn't, el verbo queda en forma base (sin -s)."}
+      ]
+    },
+    {
+      "rule_id": "GR-PRESENT-NEG",
+      "title": "Present Simple (Negativo y Preguntas)",
+      "category": "Tiempos verbales",
+      "subtopic_ids": ["A1-M01-ST06"],
+      "rule": "Para negar, usa don't/doesn't + verbo base. Para preguntar, usa Do/Does + sujeto + verbo base.",
+      "structure": "Negativa: Sujeto + don't/doesn't + verbo base\nPregunta: Do/Does + sujeto + verbo base?",
+      "examples": [
+        {"en": "I don't work on Sundays.", "es": "No trabajo los domingos."},
+        {"en": "She doesn't like coffee.", "es": "A ella no le gusta el café."},
+        {"en": "Do you speak English?", "es": "¿Hablas inglés?"},
+        {"en": "Does he play soccer?", "es": "¿Él juega fútbol?"}
+      ],
+      "tips": [
+        "don't = do not (para I, you, we, they)",
+        "doesn't = does not (para he, she, it)",
+        "Después de don't/doesn't, el verbo NUNCA lleva -s",
+        "En preguntas: Do I/you/we/they...? Does he/she/it...?"
+      ],
+      "common_mistakes": [
+        {"wrong": "She doesn't likes coffee.", "right": "She doesn't like coffee.", "why": "Después de doesn't, el verbo queda en forma base."},
+        {"wrong": "Do he play soccer?", "right": "Does he play soccer?", "why": "Con he/she/it, usa 'does' en lugar de 'do'."}
+      ]
+    },
+    {
+      "rule_id": "GR-THERE-IS",
+      "title": "There is / There are",
+      "category": "Estructura de oraciones",
+      "subtopic_ids": ["A1-M01-ST07"],
+      "rule": "There is + sustantivo singular/uncountable. There are + sustantivo plural. Indica existencia.",
+      "structure": "There is + a/an + sustantivo singular\nThere are + sustantivo plural\nIs there...? / Are there...?",
+      "examples": [
+        {"en": "There is a cat on the table.", "es": "Hay un gato en la mesa."},
+        {"en": "There are three books.", "es": "Hay tres libros."},
+        {"en": "There is some water.", "es": "Hay un poco de agua."},
+        {"en": "Is there a bank near here?", "es": "¿Hay un banco cerca de aquí?"}
+      ],
+      "tips": [
+        "There is = There's (contracto)",
+        "Con 'some' en afirmativas: There is some milk",
+        "Con 'any' en preguntas/negativas: Is there any milk?",
+        "La contracción de 'there are' no existe, se escribe completo"
+      ],
+      "common_mistakes": [
+        {"wrong": "There is three books.", "right": "There are three books.", "why": "Con sustantivos en plural, usa 'are'."},
+        {"wrong": "It has a cat on the table.", "right": "There is a cat on the table.", "why": "'It has' indica posesión, 'there is' indica existencia."}
+      ]
+    },
+    {
+      "rule_id": "GR-SOME-ANY",
+      "title": "Sustantivos Contables/Incontables y Some/Any",
+      "category": "Sustantivos",
+      "subtopic_ids": ["A1-M01-ST08"],
+      "rule": "Some se usa en oraciones afirmativas. Any se usa en preguntas y negativas. A lot of funciona para ambos.",
+      "structure": "Afirmativa: I have some books / some water\nNegativa: I don't have any books / any water\nPregunta: Do you have any books? / Is there any water?",
+      "examples": [
+        {"en": "I have some books.", "es": "Tengo algunos libros."},
+        {"en": "I don't have any books.", "es": "No tengo ningún libro."},
+        {"en": "Do you have any water?", "es": "¿Tienes algo de agua?"},
+        {"en": "She has a lot of friends.", "es": "Ella tiene muchos amigos."}
+      ],
+      "tips": [
+        "Some = cantidades indefinidas en afirmativas",
+        "Any = cantidades indefinidas en preguntas y negativas",
+        "A lot of = muchos/mucha (funciona en afirmativas, negativas y preguntas)",
+        "Sustantivos contables: books, students, apples (se pueden contar)",
+        "Sustantivos incontables: water, money, information (no se pueden contar directamente)"
+      ],
+      "common_mistakes": [
+        {"wrong": "I need some informations.", "right": "I need some information.", "why": "'Information' es incontable en inglés, no lleva -s."},
+        {"wrong": "Do you have some money?", "right": "Do you have any money?", "why": "En preguntas usa 'any', no 'some'."}
+      ]
+    },
+    {
+      "rule_id": "GR-PREPOSITIONS",
+      "title": "Preposiciones de Lugar y Tiempo",
+      "category": "Preposiciones",
+      "subtopic_ids": ["A1-M01-ST09"],
+      "rule": "In = dentro de / en (meses, años). On = sobre / en (días, superficies). At = en (puntos específicos, horas).",
+      "structure": "Lugar: in (ciudad, país), on (superficie), at (punto específico)\nTiempo: in (meses, años), on (días), at (horas)",
+      "examples": [
+        {"en": "I live in Mexico.", "es": "Vivo en México."},
+        {"en": "The book is on the table.", "es": "El libro está en la mesa."},
+        {"en": "I wake up at 7 a.m.", "es": "Me despierto a las 7 a.m."},
+        {"en": "We meet on Monday.", "es": "Nos vemos el lunes."}
+      ],
+      "tips": [
+        "IN = espacios grandes: in the room, in Mexico, in January, in 2025",
+        "ON = superficies: on the table, on the wall, on Monday, on July 15th",
+        "AT = puntos específicos: at home, at school, at 3 p.m., at night",
+        "EXCEPTO: at night (no 'in the night'), in the morning (no 'at morning')"
+      ],
+      "common_mistakes": [
+        {"wrong": "I live on Mexico.", "right": "I live in Mexico.", "why": "Países y ciudades usan 'in', no 'on'."},
+        {"wrong": "I wake up in 7 a.m.", "right": "I wake up at 7 a.m.", "why": "Horas específicas usan 'at'."}
+      ]
+    },
+    {
+      "rule_id": "GR-PRONOUNS",
+      "title": "Pronombres Sujetos y Objetivos",
+      "category": "Pronombres",
+      "subtopic_ids": ["A1-M01-ST01"],
+      "rule": "Pronombres sujetos realizan la acción. Pronombres objetos reciben la acción.",
+      "structure": "Sujeto: I, You, He, She, It, We, They\nObjeto: me, you, him, her, it, us, them",
+      "examples": [
+        {"en": "I love music. / She loves me.", "es": "Yo amo la música. / Ella me quiere."},
+        {"en": "He sees them. / They call him.", "es": "Él los ve. / Ellos lo llaman."},
+        {"en": "Give it to her.", "es": "Dáselo a ella."}
+      ],
+      "tips": [
+        "Sujeto va ANTES del verbo: I see him",
+        "Objeto va DESPUÉS del verbo: He sees me",
+        "Me, him, her, us, them NUNCA van al inicio de oración",
+        "Después de preposiciones siempre va pronombre objeto: for me, with him"
+      ],
+      "common_mistakes": [
+        {"wrong": "Me love music.", "right": "I love music.", "why": "'Me' es pronombre objeto, no puede iniciar una oración como sujeto."},
+        {"wrong": "She give it to I.", "right": "She gives it to me.", "why": "Después de preposiciones usa pronombre objeto: 'to me'."}
+      ]
+    },
+    {
+      "rule_id": "GR-POSSESSIVES",
+      "title": "Adjetivos y Pronombres Posesivos",
+      "category": "Pronombres",
+      "subtopic_ids": ["A1-M01-ST03"],
+      "rule": "Los adjetivos posesivos van ANTES del sustantivo. Los pronombres posesivos reemplazan al sustantivo.",
+      "structure": "Adjetivo: my, your, his, her, its, our, their + sustantivo\nPronombre: mine, yours, his, hers, its, ours, theirs (sin sustantivo)",
+      "examples": [
+        {"en": "This is my book. / This book is mine.", "es": "Este es mi libro. / Este libro es mío."},
+        {"en": "Her phone is red. / The red phone is hers.", "es": "Su teléfono es rojo. / El teléfono rojo es suyo."},
+        {"en": "Our house is big. / The big house is ours.", "es": "Nuestra casa es grande. / La casa grande es nuestra."}
+      ],
+      "tips": [
+        "Adjetivo posesivo + sustantivo: my book, your name, his car",
+        "Pronombre posesivo SOLA (sin sustantivo): mine, yours, his, hers",
+        "Its = posesivo de 'it' (su/su cosa). It's = contracción de 'it is'",
+        "His es既是adjetoivo como pronombre: His car / The car is his"
+      ],
+      "common_mistakes": [
+        {"wrong": "This is mine book.", "right": "This is my book.", "why": "Antes del sustantivo usa adjetivo posesivo (my), no pronombre (mine)."},
+        {"wrong": "The car is her's.", "right": "The car is hers.", "why": "El pronombre posesivo de 'her' es 'hers' sin apóstrofe."}
+      ]
+    },
+    {
+      "rule_id": "GR-MODALS",
+      "title": "Verbos Modales: Can, Must",
+      "category": "Verbos",
+      "subtopic_ids": ["A1-M01-ST05"],
+      "rule": "Can indica habilidad o permiso. Must indica obligación. Ambos van con verbo base.",
+      "structure": "Sujeto + can/must + verbo base\nNegativa: can't / mustn't + verbo base",
+      "examples": [
+        {"en": "I can swim.", "es": "Yo puedo nadar."},
+        {"en": "She can speak English.", "es": "Ella puede hablar inglés."},
+        {"en": "You must study.", "es": "Debes estudiar."},
+        {"en": "You mustn't be late.", "es": "No debes llegar tarde."}
+      ],
+      "tips": [
+        "Can es igual en todas las personas: I can, She can, They can",
+        "No se le agrega -s a can ni a must",
+        "La negativa de can es can't (no 'cannots')",
+        "Mustn't = prohibición, don't have to = no es obligatorio"
+      ],
+      "common_mistakes": [
+        {"wrong": "She cans swim.", "right": "She can swim.", "why": "Can nunca lleva -s, es igual en todas las personas."},
+        {"wrong": "I musts study.", "right": "I must study.", "why": "Must es igual en todas las personas, sin -s."}
+      ]
+    }
+  ]
+}

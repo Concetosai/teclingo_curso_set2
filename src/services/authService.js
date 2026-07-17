@@ -1,5 +1,5 @@
 const GOOGLE_CLIENT_ID = '765600384773-tq06mk73fsvvqmae19mq4huio3l908ap.apps.googleusercontent.com';
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwmgtXGxEG0Lv6n99iWr-ZTDpAZv6llj5sk0XiPnZFLFHlJCRQ2xkhfDtLSNEmQg6OGqQ/exec';
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbz_aCE0YmQvfCB3tLJkB7g5KXt-fev72I2vWRBk2wSOsDlC6GtNo0JGHX-1sO2X-lX8lg/exec';
 
 const SESSION_KEY = 'teclingo_session_active';
 
