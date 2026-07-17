@@ -770,6 +770,528 @@
 }
 
 /* ============================================
+   GENERIC PAGE PANEL 3D
+   ============================================ */
+
+.panel-3d {
+  background: linear-gradient(145deg, #0f172a, #131c31);
+  border-radius: 16px;
+  border: 1px solid rgba(56, 120, 200, 0.12);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.02),
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(56, 120, 200, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-3d::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(180deg, rgba(56, 120, 200, 0.04) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.panel-3d::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  border-radius: 0 0 16px 16px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.15) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Panel with gradient accent header */
+.panel-header-3d {
+  background: linear-gradient(145deg, #0f172a, #131c31);
+  border-radius: 16px;
+  border: 1px solid rgba(56, 120, 200, 0.12);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.02),
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(56, 120, 200, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-header-3d::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  border-radius: 16px 16px 0 0;
+  pointer-events: none;
+}
+
+/* Accent color variants for panel-header-3d */
+.panel-header-blue::before {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
+}
+.panel-header-blue { border-color: rgba(59, 130, 246, 0.2); }
+
+.panel-header-green::before {
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.08) 0%, transparent 100%);
+}
+.panel-header-green { border-color: rgba(34, 197, 94, 0.2); }
+
+.panel-header-amber::before {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%);
+}
+.panel-header-amber { border-color: rgba(245, 158, 11, 0.2); }
+
+.panel-header-purple::before {
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.08) 0%, transparent 100%);
+}
+.panel-header-purple { border-color: rgba(168, 85, 247, 0.2); }
+
+.panel-header-pink::before {
+  background: linear-gradient(180deg, rgba(236, 72, 153, 0.08) 0%, transparent 100%);
+}
+.panel-header-pink { border-color: rgba(236, 72, 153, 0.2); }
+
+/* ============================================
+   GENERIC STAT CARD 3D
+   ============================================ */
+
+.stat-card-3d {
+  background: linear-gradient(180deg, #162033 0%, #0f172a 40%, #0c1424 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(56, 120, 200, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card-3d::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(180deg, rgba(100, 160, 255, 0.04) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.stat-card-3d::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35%;
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* ============================================
+   GENERIC GAME CARD 3D
+   ============================================ */
+
+.game-card-3d {
+  position: relative;
+  background: linear-gradient(180deg, #162033 0%, #0f172a 40%, #0c1424 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(56, 120, 200, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.game-card-3d::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(180deg, rgba(100, 160, 255, 0.04) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.game-card-3d::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35%;
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.game-card-3d:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(56, 120, 200, 0.1);
+}
+
+.game-card-3d:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Game card hover accent variants */
+.game-card-green:hover { border-color: rgba(34, 197, 94, 0.4); }
+.game-card-purple:hover { border-color: rgba(168, 85, 247, 0.4); }
+.game-card-orange:hover { border-color: rgba(249, 115, 22, 0.4); }
+.game-card-cyan:hover { border-color: rgba(6, 182, 212, 0.4); }
+.game-card-yellow:hover { border-color: rgba(234, 179, 8, 0.4); }
+.game-card-blue:hover { border-color: rgba(59, 130, 246, 0.4); }
+
+/* ============================================
+   GENERIC ACTION BUTTON 3D
+   ============================================ */
+
+.action-btn-3d {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.action-btn-3d::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  border-radius: 10px 10px 0 0;
+  pointer-events: none;
+}
+
+.action-btn-3d::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  border-radius: 0 0 10px 10px;
+  pointer-events: none;
+}
+
+/* Blue action */
+.action-btn-blue {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 40%, #1d4ed8 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(37, 99, 235, 0.35),
+    0 0 16px rgba(59, 130, 246, 0.1);
+}
+.action-btn-blue::before {
+  background: linear-gradient(180deg, rgba(100, 180, 255, 0.1) 0%, transparent 100%);
+}
+.action-btn-blue::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+}
+.action-btn-blue:hover {
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 40%, #2563eb 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 6px 16px rgba(37, 99, 235, 0.45),
+    0 0 24px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px) scale(1.02);
+}
+.action-btn-blue:active {
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Green action */
+.action-btn-green {
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 40%, #15803d 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(22, 163, 74, 0.35),
+    0 0 16px rgba(34, 197, 94, 0.1);
+}
+.action-btn-green::before {
+  background: linear-gradient(180deg, rgba(100, 255, 150, 0.1) 0%, transparent 100%);
+}
+.action-btn-green::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+}
+.action-btn-green:hover {
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 40%, #16a34a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 6px 16px rgba(22, 163, 74, 0.45),
+    0 0 24px rgba(34, 197, 94, 0.15);
+  transform: translateY(-1px) scale(1.02);
+}
+.action-btn-green:active {
+  background: linear-gradient(180deg, #15803d 0%, #166534 100%);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Amber action */
+.action-btn-amber {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 40%, #b45309 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(217, 119, 6, 0.35),
+    0 0 16px rgba(245, 158, 11, 0.1);
+}
+.action-btn-amber::before {
+  background: linear-gradient(180deg, rgba(255, 200, 50, 0.1) 0%, transparent 100%);
+}
+.action-btn-amber::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+}
+.action-btn-amber:hover {
+  background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 40%, #d97706 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 6px 16px rgba(217, 119, 6, 0.45),
+    0 0 24px rgba(245, 158, 11, 0.15);
+  transform: translateY(-1px) scale(1.02);
+}
+.action-btn-amber:active {
+  background: linear-gradient(180deg, #b45309 0%, #92400e 100%);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Purple action */
+.action-btn-purple {
+  background: linear-gradient(180deg, #a855f7 0%, #9333ea 40%, #7e22ce 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(147, 51, 234, 0.35),
+    0 0 16px rgba(168, 85, 247, 0.1);
+}
+.action-btn-purple::before {
+  background: linear-gradient(180deg, rgba(200, 130, 255, 0.1) 0%, transparent 100%);
+}
+.action-btn-purple::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+}
+.action-btn-purple:hover {
+  background: linear-gradient(180deg, #c084fc 0%, #a855f7 40%, #9333ea 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 6px 16px rgba(147, 51, 234, 0.45),
+    0 0 24px rgba(168, 85, 247, 0.15);
+  transform: translateY(-1px) scale(1.02);
+}
+.action-btn-purple:active {
+  background: linear-gradient(180deg, #7e22ce 0%, #6b21a8 100%);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Pink action */
+.action-btn-pink {
+  background: linear-gradient(180deg, #ec4899 0%, #db2777 40%, #be185d 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(219, 39, 119, 0.35),
+    0 0 16px rgba(236, 72, 153, 0.1);
+}
+.action-btn-pink::before {
+  background: linear-gradient(180deg, rgba(255, 130, 200, 0.1) 0%, transparent 100%);
+}
+.action-btn-pink::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+}
+.action-btn-pink:hover {
+  background: linear-gradient(180deg, #f472b6 0%, #ec4899 40%, #db2777 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 6px 16px rgba(219, 39, 119, 0.45),
+    0 0 24px rgba(236, 72, 153, 0.15);
+  transform: translateY(-1px) scale(1.02);
+}
+.action-btn-pink:active {
+  background: linear-gradient(180deg, #be185d 0%, #9d174d 100%);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Red (danger/logout) action */
+.action-btn-red {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 40%, #b91c1c 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(220, 38, 38, 0.35);
+}
+.action-btn-red::before {
+  background: linear-gradient(180deg, rgba(255, 120, 120, 0.1) 0%, transparent 100%);
+}
+.action-btn-red::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0%, transparent 100%);
+}
+
+/* ============================================
+   SKILL TAB 3D BUTTONS
+   ============================================ */
+
+.skill-tab-3d {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.skill-tab-3d::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  border-radius: 8px 8px 0 0;
+  pointer-events: none;
+}
+
+.skill-tab-3d::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  border-radius: 0 0 8px 8px;
+  pointer-events: none;
+}
+
+/* Inactive skill tab */
+.skill-tab-inactive {
+  background: linear-gradient(180deg, #1a3a6e 0%, #142d54 40%, #0f2240 100%);
+  color: #94b8e8;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.skill-tab-inactive::before {
+  background: linear-gradient(180deg, rgba(100, 160, 255, 0.06) 0%, transparent 100%);
+}
+
+.skill-tab-inactive::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0%, transparent 100%);
+}
+
+.skill-tab-inactive:hover {
+  background: linear-gradient(180deg, #1f4580 0%, #183560 40%, #132a4c 100%);
+  color: #b0d0ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    0 5px 10px rgba(0, 0, 0, 0.5);
+  transform: translateY(-1px) scale(1.02);
+}
+
+.skill-tab-inactive:active {
+  background: linear-gradient(180deg, #142d54 0%, #0f2240 100%);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px) scale(0.97);
+}
+
+/* Active skill tab (purple) */
+.skill-tab-active {
+  background: linear-gradient(180deg, #a855f7 0%, #9333ea 40%, #7e22ce 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 3px 6px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.1),
+    0 1px 2px rgba(168, 85, 247, 0.3),
+    0 0 12px rgba(168, 85, 247, 0.2);
+  transform: translateY(1px) scale(0.98);
+}
+
+.skill-tab-active::before {
+  background: linear-gradient(180deg, rgba(200, 130, 255, 0.1) 0%, transparent 100%);
+}
+
+.skill-tab-active::after {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0%, transparent 100%);
+}
+
+/* ============================================
    MOBILE ACCORDION HEADER
    ============================================ */
 

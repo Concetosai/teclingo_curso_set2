@@ -350,11 +350,11 @@ function App() {
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 max-w-md w-full text-center">
+        <div className="panel-header-3d panel-header-blue p-8 max-w-md w-full text-center">
           <h1 className="text-3xl font-bold text-blue-500 mb-2">TECLINGO AI</h1>
           <p className="text-slate-400 mb-6">Nivel A1 - Curso de Inglés</p>
           <button onClick={handleLogin} disabled={loggingIn}
-            className="w-full py-3 bg-white text-slate-800 rounded-lg font-bold text-lg hover:bg-slate-100 disabled:opacity-50 flex items-center justify-center gap-3">
+            className="action-btn-3d action-btn-blue w-full py-3 text-lg disabled:opacity-50 justify-center">
             {loggingIn ? (<><span className="animate-spin">⏳</span> Conectando con Google...</>) : (<>🔑 Iniciar sesión con Google</>)}
           </button>
           <p className="text-slate-500 text-xs mt-4">Tu progreso se guarda automáticamente</p>
@@ -608,24 +608,24 @@ function App() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                  <div className="stat-card-3d p-6">
                     <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">Progreso del Módulo</p>
                     <div className="flex items-end gap-2 mt-2"><span className="text-4xl font-bold text-white">{realProgress.overall_completion}%</span><span className="text-slate-500 mb-1">completado</span></div>
                     <div className="w-full bg-slate-700 rounded-full h-2.5 mt-4"><div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${realProgress.overall_completion}%` }}></div></div>
                   </div>
-                  <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                  <div className="stat-card-3d p-6">
                     <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">🎯 Promedio General</p>
                     <div className="flex items-end gap-2 mt-2"><span className="text-4xl font-bold text-amber-400">{realProgress.overall_average}</span><span className="text-slate-500 mb-1">/ 100</span></div>
                     <div className="w-full bg-slate-700 rounded-full h-2.5 mt-4"><div className="bg-amber-500 h-2.5 rounded-full" style={{ width: `${realProgress.overall_average}%` }}></div></div>
                   </div>
-                  <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                  <div className="stat-card-3d p-6">
                     <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">🌍 Mundo</p>
                     <div className="flex items-end gap-2 mt-2"><span className="text-2xl font-bold text-blue-400 capitalize">{realProgress.world || userContext.institutional_world.replace('_', ' ')}</span></div>
                     <p className="text-slate-500 text-xs mt-2">{realProgress.total_entries} ejercicios evaluados</p>
                   </div>
                 </div>
 
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                <div className="panel-3d p-6">
                   <h3 className="text-lg font-bold text-white mb-4">📊 Detalle por Habilidad</h3>
                   <div className="space-y-4">
                     {Object.entries(realProgress.skill_stats || {}).map(([skill, stats]: [string, any]) => {
@@ -661,20 +661,26 @@ function App() {
                   </div>
                 </div>
 
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                <div className="panel-3d p-6">
                   <h3 className="text-lg font-bold text-white mb-4">🚀 Acciones Rápidas</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <button onClick={() => setActiveTab('lesson')} className="p-4 bg-blue-900/30 border border-blue-700 rounded-xl hover:bg-blue-900/50 transition-all text-left">
-                      <p className="text-blue-400 font-bold text-sm">📚 Practicar Lecciones</p>
-                      <p className="text-slate-400 text-xs mt-1">Mejora tus habilidades con ejercicios</p>
+                    <button onClick={() => setActiveTab('lesson')} className="action-btn-3d action-btn-blue p-4 text-left justify-start">
+                      <div>
+                        <p className="font-bold text-sm">📚 Practicar Lecciones</p>
+                        <p className="text-blue-100/70 text-xs mt-1">Mejora tus habilidades con ejercicios</p>
+                      </div>
                     </button>
-                    <button onClick={() => setActiveTab('exam')} className="p-4 bg-amber-900/30 border border-amber-700 rounded-xl hover:bg-amber-900/50 transition-all text-left">
-                      <p className="text-amber-400 font-bold text-sm">📝 Tomar Examen A1</p>
-                      <p className="text-slate-400 text-xs mt-1">Certifica tu nivel</p>
+                    <button onClick={() => setActiveTab('exam')} className="action-btn-3d action-btn-amber p-4 text-left justify-start">
+                      <div>
+                        <p className="font-bold text-sm">📝 Tomar Examen A1</p>
+                        <p className="text-amber-100/70 text-xs mt-1">Certifica tu nivel</p>
+                      </div>
                     </button>
-                    <button onClick={() => setActiveTab('library')} className="p-4 bg-purple-900/30 border border-purple-700 rounded-xl hover:bg-purple-900/50 transition-all text-left">
-                      <p className="text-purple-400 font-bold text-sm">📖 Ver Librería</p>
-                      <p className="text-slate-400 text-xs mt-1">Consulta reglas gramaticales</p>
+                    <button onClick={() => setActiveTab('library')} className="action-btn-3d action-btn-purple p-4 text-left justify-start">
+                      <div>
+                        <p className="font-bold text-sm">📖 Ver Librería</p>
+                        <p className="text-purple-100/70 text-xs mt-1">Consulta reglas gramaticales</p>
+                      </div>
                     </button>
                   </div>
                 </div>
@@ -691,7 +697,7 @@ function App() {
 
         {activeTab === 'library' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="bg-gradient-to-r from-amber-900/40 to-orange-900/40 border border-amber-700 p-6 rounded-xl">
+            <div className="panel-header-3d panel-header-amber p-6">
               <h2 className="text-2xl font-bold text-amber-400 mb-2">📚 Librería del Módulo 1</h2>
               <p className="text-slate-300 text-sm">Referencia rápida de todo lo que necesitas saber en este nivel.</p>
             </div>
@@ -701,7 +707,7 @@ function App() {
 
         {activeTab === 'settings' && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-700 p-6 rounded-2xl shadow-lg space-y-4">
+            <div className="panel-header-3d panel-header-blue p-6 space-y-4">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-3xl">🌎</span>
                 <div>
@@ -757,16 +763,16 @@ function App() {
           <div className="space-y-6 animate-in fade-in duration-300">
             {!gameType ? (
               <>
-                <div className="bg-gradient-to-r from-pink-900/40 to-purple-900/40 border border-pink-700 p-6 rounded-2xl shadow-lg">
+                <div className="panel-header-3d panel-header-pink p-6">
                   <h2 className="text-2xl font-bold text-pink-400 mb-2">🎮 Mini-Juegos</h2>
                   <p className="text-slate-300 text-sm">Practica inglés de forma divertida con juegos interactivos. ¡Usa el vocabulario y gramática de la lección actual!</p>
                 </div>
 
-                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                <div className="panel-3d p-4">
                   <p className="text-sm text-slate-400 mb-3">Selecciona una habilidad para practicar:</p>
                   <div className="flex flex-wrap gap-2">
                     {skillLabels.map(s => (
-                      <button key={s.key} onClick={() => setGameSkill(s.key)} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${gameSkill === s.key ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                      <button key={s.key} onClick={() => setGameSkill(s.key)} className={`skill-tab-3d ${gameSkill === s.key ? 'skill-tab-active' : 'skill-tab-inactive'}`}>
                         {s.icon} {s.label}
                       </button>
                     ))}
@@ -774,37 +780,37 @@ function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <button onClick={() => setGameType('true_false')} className="p-6 bg-slate-800 border border-slate-700 rounded-xl hover:border-green-500 hover:bg-green-900/20 transition-all text-left">
+                  <button onClick={() => setGameType('true_false')} className="game-card-3d game-card-green p-6 text-left">
                     <p className="text-3xl mb-2">✅</p>
                     <h3 className="text-white font-bold">True / False</h3>
                     <p className="text-slate-400 text-sm mt-1">Determina si las oraciones son correctas</p>
                     <p className="text-green-400 text-xs mt-2">📝 Grammar · 📚 Vocabulary</p>
                   </button>
-                  <button onClick={() => setGameType('flashcards')} className="p-6 bg-slate-800 border border-slate-700 rounded-xl hover:border-purple-500 hover:bg-purple-900/20 transition-all text-left">
+                  <button onClick={() => setGameType('flashcards')} className="game-card-3d game-card-purple p-6 text-left">
                     <p className="text-3xl mb-2">🃏</p>
                     <h3 className="text-white font-bold">Flashcards</h3>
                     <p className="text-slate-400 text-sm mt-1">Voltea tarjetas para memorizar vocabulario</p>
                     <p className="text-purple-400 text-xs mt-2">📚 Vocabulary</p>
                   </button>
-                  <button onClick={() => setGameType('hangman')} className="p-6 bg-slate-800 border border-slate-700 rounded-xl hover:border-orange-500 hover:bg-orange-900/20 transition-all text-left">
+                  <button onClick={() => setGameType('hangman')} className="game-card-3d game-card-orange p-6 text-left">
                     <p className="text-3xl mb-2">💀</p>
                     <h3 className="text-white font-bold">Hangman</h3>
                     <p className="text-slate-400 text-sm mt-1">Adivina la palabra letra por letra</p>
                     <p className="text-orange-400 text-xs mt-2">📚 Vocabulary · 📝 Grammar</p>
                   </button>
-                  <button onClick={() => setGameType('drag_drop')} className="p-6 bg-slate-800 border border-slate-700 rounded-xl hover:border-cyan-500 hover:bg-cyan-900/20 transition-all text-left">
+                  <button onClick={() => setGameType('drag_drop')} className="game-card-3d game-card-cyan p-6 text-left">
                     <p className="text-3xl mb-2">🎯</p>
                     <h3 className="text-white font-bold">Emparejar</h3>
                     <p className="text-slate-400 text-sm mt-1">Conecta palabras con sus traducciones</p>
                     <p className="text-cyan-400 text-xs mt-2">📚 Vocabulary</p>
                   </button>
-                  <button onClick={() => setGameType('timer_quiz')} className="p-6 bg-slate-800 border border-slate-700 rounded-xl hover:border-yellow-500 hover:bg-yellow-900/20 transition-all text-left">
+                  <button onClick={() => setGameType('timer_quiz')} className="game-card-3d game-card-yellow p-6 text-left">
                     <p className="text-3xl mb-2">⏱️</p>
                     <h3 className="text-white font-bold">Quiz Reloj</h3>
                     <p className="text-slate-400 text-sm mt-1">Responde rápido antes de que se agote el tiempo</p>
                     <p className="text-yellow-400 text-xs mt-2">📝 All Skills</p>
                   </button>
-                  <button onClick={() => setGameType('ai_conversation')} className="p-6 bg-slate-800 border border-slate-700 rounded-xl hover:border-blue-500 hover:bg-blue-900/20 transition-all text-left">
+                  <button onClick={() => setGameType('ai_conversation')} className="game-card-3d game-card-blue p-6 text-left">
                     <p className="text-3xl mb-2">🗣️</p>
                     <h3 className="text-white font-bold">AI Conversation</h3>
                     <p className="text-slate-400 text-sm mt-1">Chatea con el tutor de IA en inglés</p>
@@ -813,7 +819,7 @@ function App() {
                 </div>
 
                 {Object.keys(gameResults).length > 0 && (
-                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                  <div className="panel-3d p-4">
                     <h3 className="text-white font-bold mb-3">📊 Resultados Recientes</h3>
                     <div className="space-y-2">
                       {Object.entries(gameResults).map(([game, score]) => (
@@ -832,7 +838,7 @@ function App() {
                   ← Volver a Juegos
                 </button>
 
-                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
+                <div className="panel-3d p-4 flex items-center justify-between">
                   <h3 className="text-white font-bold">
                     {gameType === 'true_false' && '✅ True / False'}
                     {gameType === 'flashcards' && '🃏 Flashcards'}
@@ -844,7 +850,7 @@ function App() {
                   <span className="text-slate-400 text-sm">{skillLabels.find(s => s.key === gameSkill)?.icon} {skillLabels.find(s => s.key === gameSkill)?.label}</span>
                 </div>
 
-                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                <div className="panel-3d p-6">
                   {gameType === 'true_false' && grammarExercises.length > 0 && (
                     <TrueFalseExercise
                       exercises={grammarExercises}
@@ -945,12 +951,12 @@ function App() {
 
             {data ? (
               <>
-                <section className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                <section className="panel-3d p-6">
                   <h2 className="text-xl font-bold text-white mb-2">{adaptText(data.title)}</h2>
                   <p className="text-slate-400 italic">"{data.mcer_goal || data.mcer_descriptor}"</p>
                 </section>
 
-                {data.theory && <section className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg"><h3 className="text-xl font-bold text-blue-400 mb-3">📖 Teoría</h3><p className="text-slate-300 leading-relaxed">{adaptText(data.theory)}</p></section>}
+                {data.theory && <section className="panel-3d p-6"><h3 className="text-xl font-bold text-blue-400 mb-3">📖 Teoría</h3><p className="text-slate-300 leading-relaxed">{adaptText(data.theory)}</p></section>}
 
                 {allSkillsCompleted() ? (
                   <section className="bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl p-8 text-center shadow-2xl">
@@ -975,10 +981,10 @@ function App() {
                     </div>
                   </section>
                 ) : (
-                <section className="bg-slate-800 p-6 rounded-xl border border-purple-900/50 shadow-lg">
+                <section className="panel-3d panel-header-purple p-6">
                   <h3 className="text-xl font-bold text-purple-400 mb-4">Práctica por Habilidad</h3>
-                  <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-700 pb-3">
-                    {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`px-3 py-2 rounded-lg text-sm font-medium ${skillTab === s.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{s.icon} {s.label}</button>))}
+                  <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-700/50 pb-3">
+                    {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`skill-tab-3d ${skillTab === s.key ? 'skill-tab-active' : 'skill-tab-inactive'}`}>{s.icon} {s.label}</button>))}
                   </div>
 
                   {/* GRAMMAR */}
@@ -1547,9 +1553,9 @@ function App() {
                 )}
               </>
             ) : (
-              <div className="bg-yellow-900/30 border border-yellow-700 p-6 rounded-xl text-center">
+              <div className="panel-header-3d panel-header-amber p-6 text-center">
                 <p className="text-yellow-400 text-lg mb-2">⚠️ No se pudo cargar el contenido de la lección</p>
-                <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold">Recargar Página</button>
+                <button onClick={() => window.location.reload()} className="action-btn-3d action-btn-amber mt-4">Recargar Página</button>
               </div>
             )}
           </div>
