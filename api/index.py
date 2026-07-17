@@ -6,11 +6,10 @@ import urllib.request
 import urllib.parse
 from fastapi import FastAPI, APIRouter, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List, Optional, Dict, Any
 from groq import Groq
-
 
 # ==========================================
 # CONFIG
@@ -20,12 +19,15 @@ class Settings(BaseSettings):
     GOOGLE_APPS_SCRIPT_URL: str = ""
     GOOGLE_CLIENT_ID: str = ""
     ENVIRONMENT: str = "development"
+    VITE_API_URL: str = ""
 
-    class Config:
-        env_file = ".env"
+    # Busca el archivo .env en la carpeta raíz (un nivel arriba de 'api')
+    model_config = ConfigDict(
+        env_file=os.path.join(os.path.dirname(__file__), "..", ".env"),
+        extra="ignore"
+    )
 
 settings = Settings()
-
 
 # ==========================================
 # TUTOR SERVICE
@@ -34,7 +36,7 @@ class TutorService:
     def __init__(self):
         api_key = settings.GROQ_API_KEY
         if not api_key:
-            raise ValueError("GROQ_API_KEY no encontrada.")
+            raise ValueError("GROQ_API_KEY no encontrada. Verifica tu archivo .env en la raíz del proyecto.")
         self.client = Groq(api_key=api_key)
 
     def evaluate_batch(self, exercises: list, user_context: dict = None) -> dict:
@@ -67,19 +69,12 @@ You are currently teaching a student with the following INSTITUTIONAL PROFILE:
 CRITICAL PEDAGOGICAL RULES:
 1. STRICT CONTEXTUALIZATION: You MUST use the characters, places, and scenarios provided above.
 2. LANGUAGE: Your 'summary', 'feedback', and 'pedagogical_reason' MUST BE IN SPANISH.
-3. GRAMMAR SCOPE: Strictly use ONLY A1 grammar (Verb To Be, Subject Pronouns, Possessive Adjectives, Basic Prepositions, Present Simple for routines).
-4. SPEAKING/PRONUNCIATION TOLERANCE: NEVER penalize for exact string matching. IGNORE instructional words like "Say:", "Graba:", "Answer:". Evaluate based on PHONETIC SIMILARITY and CORE MEANING.
+3. GRAMMAR SCOPE: Strictly use ONLY A1 grammar.
+4. SPEAKING/PRONUNCIATION TOLERANCE: NEVER penalize for exact string matching. Evaluate based on PHONETIC SIMILARITY and CORE MEANING.
 5. "I DON'T KNOW": If the user writes "no sé", gently encourage them to try.
 6. PEDAGOGICAL REASON: Base your 'pedagogical_reason' on strict A1 rules explained in Spanish.
 7. *** ABSOLUTELY CRITICAL - THE 'feedback' FIELD MUST NEVER CONTAIN THE CORRECT ANSWER WORD ***
 8. MULTIPLE VALID ANSWERS: If the user's answer is grammatically correct in the context, give FULL CREDIT.
-9. GRAMMAR RULE REFERENCE: When an answer is WRONG, include a 'rule_hint' field.
-10. GRAMMAR MULTIPLE CHOICE: Evaluate based on GRAMMATICAL CORRECTNESS, NOT string comparison.
-11. FILL-IN-THE-BLANK: If the user_answer CONTAINS the correct_answer word (case-insensitive), give FULL CREDIT.
-12. PUNCTUATION IN SPEAKING: DO NOT penalize for missing punctuation.
-13. CAPITALIZATION IN SPEAKING: Be lenient with capitalization in spoken responses.
-14. PROMPT READING DETECTION: If the user's answer is EXACTLY the same as the prompt, score it 0.
-15. EVERYDAY vs EVERY DAY: Accept BOTH forms.
 
 Return a JSON object with this EXACT structure:
 {{
@@ -146,14 +141,6 @@ LESSON TOPIC:
 
 TASK: Generate 5 NEW exercises for the skill "{skill_name}". These must be DIFFERENT from the original exercises but test the SAME grammar concept.
 
-EXERCISE FORMAT by skill:
-- grammar: Multiple choice with 3 options. Each exercise has "question", "options" (array of 3 strings), "answer".
-- vocabulary: Fill-in-the-blank. Each exercise has "question", "answer".
-- reading: Short paragraph + 3 comprehension questions. Return "text" and "questions" array.
-- listening: Short dialogue script + 3 questions. Return "script" and "questions" array.
-- writing: 3 sentence writing prompts. Each exercise has "question", "answer".
-- pronunciation: 3 speaking prompts. Each exercise has "prompt".
-
 Return a JSON object with this EXACT structure:
 {{
   "exercises": {{
@@ -197,7 +184,6 @@ Return a JSON object with this EXACT structure:
             reveal_patterns = [
                 rf"(?i)(intent|prueb|us[ae]|la respuesta es|se usa)\s*['\"]?\s*{re.escape(correct)}\b",
                 rf"(?i)['\"]?{re.escape(correct)}['\"]?\s*(para|en|por|cuando|porque|ya que|pues)",
-                rf"(?i)(us[ae]|prueb|intent)\s+['\"]?{re.escape(correct)}['\"]?",
             ]
 
             for pattern in reveal_patterns:
@@ -207,9 +193,7 @@ Return a JSON object with this EXACT structure:
 
         return result
 
-
 tutor = TutorService()
-
 
 # ==========================================
 # FASTAPI APP + ROUTER
@@ -218,11 +202,12 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 COURSE_CONTENT_PATH = os.path.join(DATA_DIR, "course_content.json")
 GRAMMAR_LIBRARY_PATH = os.path.join(DATA_DIR, "grammar_library.json")
 
-
 def _load_course_content():
-    with open(COURSE_CONTENT_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
-
+    try:
+        with open(COURSE_CONTENT_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"course_subtopics": {}, "lesson_content_variants": {}}
 
 def _call_gas(action: str, data: dict = None) -> dict:
     url = settings.GOOGLE_APPS_SCRIPT_URL
@@ -236,9 +221,7 @@ def _call_gas(action: str, data: dict = None) -> dict:
     except Exception as e:
         return {"error": str(e)}
 
-
 course_data = _load_course_content()
-
 
 class FeedbackRequest(BaseModel):
     question: str
@@ -247,11 +230,9 @@ class FeedbackRequest(BaseModel):
     common_mistakes: Optional[List[dict]] = None
     user_context: Optional[Dict[str, Any]] = None
 
-
 class BatchFeedbackRequest(BaseModel):
     exercises: List[dict]
     user_context: Optional[Dict[str, Any]] = None
-
 
 class AlternateExercisesRequest(BaseModel):
     skill: str
@@ -259,7 +240,6 @@ class AlternateExercisesRequest(BaseModel):
     theory: Optional[str] = ""
     title: Optional[str] = ""
     user_context: Optional[Dict[str, Any]] = None
-
 
 class ProgressSaveRequest(BaseModel):
     user_id: str
@@ -269,12 +249,10 @@ class ProgressSaveRequest(BaseModel):
     attempts: int
     world: Optional[str] = "tecnm"
 
-
 class ExamAnswerRequest(BaseModel):
     user_id: str
     world: str
     answers: List[dict]
-
 
 app = FastAPI(
     title="TECLINGO AI Engine",
@@ -292,7 +270,6 @@ app.add_middleware(
 
 router = APIRouter(prefix="/api/course", tags=["Course"])
 
-
 @router.get("/module/{module_id}/subtopics")
 def get_module_subtopics(module_id: str, world: Optional[str] = Query(None)):
     if world and world in ['viajes', 'vida_diaria']:
@@ -308,7 +285,6 @@ def get_module_subtopics(module_id: str, world: Optional[str] = Query(None)):
 
     module_subs = course_data.get("course_subtopics", {}).get(module_id, [])
     return [{"subtopic_id": s["subtopic_id"], "title": s["title"], "sequence_order": s["sequence_order"]} for s in module_subs]
-
 
 @router.get("/subtopic/{subtopic_id}")
 def get_subtopic(subtopic_id: str, world: Optional[str] = Query(None)):
@@ -334,7 +310,6 @@ def get_subtopic(subtopic_id: str, world: Optional[str] = Query(None)):
 
     raise HTTPException(status_code=404, detail="Subtopic not found")
 
-
 @router.post("/feedback/batch")
 def get_batch_feedback(request: BatchFeedbackRequest):
     try:
@@ -342,20 +317,6 @@ def get_batch_feedback(request: BatchFeedbackRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/feedback")
-def get_feedback(request: FeedbackRequest):
-    try:
-        result = tutor.evaluate_batch([{
-            "question": request.question,
-            "user_answer": request.user_answer,
-            "correct_answer": request.correct_answer
-        }], request.user_context)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/generate-alternate")
 def generate_alternate(request: AlternateExercisesRequest):
@@ -370,7 +331,6 @@ def generate_alternate(request: AlternateExercisesRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/progress/save")
 def save_progress(request: ProgressSaveRequest):
@@ -390,7 +350,6 @@ def save_progress(request: ProgressSaveRequest):
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
-
 @router.get("/progress/{user_id}")
 def get_progress(user_id: str, world: Optional[str] = Query(None)):
     try:
@@ -402,7 +361,6 @@ def get_progress(user_id: str, world: Optional[str] = Query(None)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/progress/{user_id}/subtopic/{subtopic_id}")
 def get_subtopic_progress(user_id: str, subtopic_id: str):
@@ -416,92 +374,11 @@ def get_subtopic_progress(user_id: str, subtopic_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/exam/a1")
-def submit_a1_exam(request: ExamAnswerRequest):
-    try:
-        A1_THRESHOLDS = {"grammar": 70, "vocabulary": 70, "reading": 60, "listening": 60, "writing": 60, "pronunciation": 60}
-
-        skill_scores = {}
-        for ans in request.answers:
-            skill = ans.get("skill", "grammar")
-            is_correct = ans.get("is_correct", False)
-            if skill not in skill_scores:
-                skill_scores[skill] = {"correct": 0, "total": 0}
-            skill_scores[skill]["total"] += 1
-            if is_correct:
-                skill_scores[skill]["correct"] += 1
-
-        results = {}
-        for skill, data in skill_scores.items():
-            pct = round((data["correct"] / data["total"]) * 100, 1) if data["total"] > 0 else 0
-            threshold = A1_THRESHOLDS.get(skill, 60)
-            results[skill] = {"score": pct, "passed": pct >= threshold, "threshold": threshold}
-
-        a1_passed = all(r["passed"] for r in results.values())
-
-        for ans in request.answers:
-            _call_gas("registrarProgreso", {
-                "email": request.user_id,
-                "subtopicId": "A1_EXAM",
-                "skill": ans.get("skill", "grammar"),
-                "score": "100" if ans.get("is_correct") else "0",
-                "attempts": "1",
-                "world": request.world,
-                "fecha": datetime.datetime.utcnow().isoformat()
-            })
-
-        return {
-            "exam_results": results,
-            "a1_passed": a1_passed,
-            "overall_score": round(sum(r["score"] for r in results.values()) / len(results), 1) if results else 0
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/grammar-library")
-def get_grammar_library():
-    try:
-        with open(GRAMMAR_LIBRARY_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/grammar-library/{rule_id}")
-def get_grammar_rule(rule_id: str):
-    try:
-        with open(GRAMMAR_LIBRARY_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        for rule in data.get("rules", []):
-            if rule["rule_id"] == rule_id:
-                return rule
-        raise HTTPException(status_code=404, detail=f"Regla '{rule_id}' no encontrada")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/grammar-library/by-subtopic/{subtopic_id}")
-def get_grammar_rules_by_subtopic(subtopic_id: str):
-    try:
-        with open(GRAMMAR_LIBRARY_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        rules = [r for r in data.get("rules", []) if subtopic_id in r.get("subtopic_ids", [])]
-        return {"subtopic_id": subtopic_id, "rules": rules}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 app.include_router(router)
-
 
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "version": "1.0.0"}
-
 
 @app.get("/api")
 def api_root():

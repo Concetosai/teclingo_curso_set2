@@ -1,17 +1,32 @@
 const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbz_aCE0YmQvfCB3tLJkB7g5KXt-fev72I2vWRBk2wSOsDlC6GtNo0JGHX-1sO2X-lX8lg/exec';
 
-function getUserEmail() {
-  try {
-    const user = JSON.parse(localStorage.getItem('teclingo_user') || '{}');
-    return user.email || '';
-  } catch { return ''; }
+interface ProgressPayload {
+  subtopicId: string;
+  skill: string;
+  score: number;
+  attempts: number;
+  world?: string;
 }
 
-async function sendToSheets(accion, datos) {
+interface UserInfo {
+  email?: string;
+}
+
+function getUserEmail(): string {
+  try {
+    const user: UserInfo = JSON.parse(localStorage.getItem('teclingo_user') || '{}');
+    return user.email || '';
+  } catch {
+    return '';
+  }
+}
+
+async function sendToSheets(accion: string, datos: Record<string, any>): Promise<void> {
   try {
     await fetch(SHEETS_API_URL, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ accion, datos })
     });
     console.log(`[Sheets] ${accion} sent`);
@@ -20,24 +35,27 @@ async function sendToSheets(accion, datos) {
   }
 }
 
-export async function saveProgress({ subtopicId, skill, score, attempts, world }) {
+export async function saveProgress(payload: ProgressPayload): Promise<void> {
   const email = getUserEmail();
   if (!email) return;
   await sendToSheets('registrarProgreso', {
-    email, subtopicId, skill,
-    score: String(score), attempts: String(attempts),
-    world: world || 'tecnm',
+    email,
+    subtopicId: payload.subtopicId,
+    skill: payload.skill,
+    score: String(payload.score),
+    attempts: String(payload.attempts),
+    world: payload.world || 'tecnm',
     fecha: new Date().toISOString()
   });
 }
 
-export async function saveActivity(tipo, detalle) {
+export async function saveActivity(tipo: string, detalle: string): Promise<void> {
   const email = getUserEmail();
   if (!email) return;
   await sendToSheets('registrarActividad', { email, tipo, detalle });
 }
 
-export async function logEntrada() {
+export async function logEntrada(): Promise<void> {
   const email = getUserEmail();
   if (!email) return;
   const now = new Date();
@@ -49,7 +67,7 @@ export async function logEntrada() {
   });
 }
 
-export async function logSalida(motivo = 'cerrar_sesion') {
+export async function logSalida(motivo: string = 'cerrar_sesion'): Promise<void> {
   const email = getUserEmail();
   if (!email) return;
   const now = new Date();
@@ -61,4 +79,5 @@ export async function logSalida(motivo = 'cerrar_sesion') {
   });
 }
 
-export default { saveProgress, saveActivity, logEntrada, logSalida };
+const sheetsService = { saveProgress, saveActivity, logEntrada, logSalida };
+export default sheetsService;''

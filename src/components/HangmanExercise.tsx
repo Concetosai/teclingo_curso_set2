@@ -33,9 +33,11 @@ export default function HangmanExercise({ exercises, onComplete }: Props) {
 
   const current = words[currentIndex];
   const total = words.length;
+  
   const wrongGuesses = useMemo(() => {
     return [...guessedLetters].filter(l => !current?.word.includes(l)).length;
   }, [guessedLetters, current]);
+  
   const won = current?.word.split('').every(l => l === ' ' || guessedLetters.has(l));
   const lost = wrongGuesses >= MAX_WRONG;
 
@@ -47,17 +49,27 @@ export default function HangmanExercise({ exercises, onComplete }: Props) {
   }, [guessedLetters, won, lost, finished]);
 
   const goToNext = useCallback(() => {
-    const newResults = { ...results, [current.id]: won ? 'won' : 'lost' };
+    // ✅ CORRECCIÓN: Tipado explícito para evitar la inferencia de 'string' genérico
+    const newResults: Record<string, 'won' | 'lost'> = { 
+      ...results, 
+      [current.id]: (won ? 'won' : 'lost') as 'won' | 'lost' 
+    };
+    
     setResults(newResults);
     setGuessedLetters(new Set());
+    
     if (currentIndex < total - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
       const wins = Object.values(newResults).filter(r => r === 'won').length;
       const score = Math.round((wins / total) * 100);
       setFinished(true);
+      
       const answers: Record<string, string> = {};
-      Object.entries(newResults).forEach(([id, result]) => { answers[id] = result; });
+      Object.entries(newResults).forEach(([id, result]) => { 
+        answers[id] = result; 
+      });
+      
       onComplete(score, answers);
     }
   }, [current, currentIndex, total, won, results, onComplete]);
@@ -81,8 +93,15 @@ export default function HangmanExercise({ exercises, onComplete }: Props) {
         <p className="text-slate-400 mb-6">
           {wins === total ? '¡Perfecto! Adivinaste todas las palabras' : `Adivinaste ${Math.round((wins / total) * 100)}% de las palabras`}
         </p>
-        <button onClick={() => { setCurrentIndex(0); setGuessedLetters(new Set()); setResults({}); setFinished(false); }}
-          className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold transition-all">
+        <button 
+          onClick={() => { 
+            setCurrentIndex(0); 
+            setGuessedLetters(new Set()); 
+            setResults({}); 
+            setFinished(false); 
+          }}
+          className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold transition-all"
+        >
           🔄 Jugar de nuevo
         </button>
       </div>
@@ -93,7 +112,14 @@ export default function HangmanExercise({ exercises, onComplete }: Props) {
     if (letter === ' ') return <span key={i} className="w-3 mx-1"></span>;
     const revealed = guessedLetters.has(letter) || won || lost;
     return (
-      <span key={i} className={`inline-block w-8 h-10 border-b-2 mx-0.5 text-center text-xl font-bold transition-all ${revealed ? (won ? 'text-green-400 border-green-400' : 'text-white border-white') : 'text-transparent border-slate-500'}`}>
+      <span 
+        key={i} 
+        className={`inline-block w-8 h-10 border-b-2 mx-0.5 text-center text-xl font-bold transition-all ${
+          revealed 
+            ? (won ? 'text-green-400 border-green-400' : 'text-white border-white') 
+            : 'text-transparent border-slate-500'
+        }`}
+      >
         {revealed ? letter : '_'}
       </span>
     );

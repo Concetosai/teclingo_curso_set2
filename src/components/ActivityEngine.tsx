@@ -4,9 +4,28 @@ interface Props {
   onNavigateToGames?: (gameType?: string) => void;
 }
 
+// 1. Definimos un tipo para el estado de actividades que acepta cualquier string como clave
+type ActivityState = Record<string, boolean>;
+
+// 2. Definimos interfaces para las categorías y sus items
+interface ActivityItem {
+  id: string;
+  name: string;
+  desc: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  ai: boolean;
+}
+
+interface Category {
+  id: string;
+  title: string;
+  icon: string;
+  items: ActivityItem[];
+}
+
 const ActivityEngine = ({ onNavigateToGames }: Props) => {
-  // Estado inicial de las actividades (simulado, luego se conectará a la BD)
-  const [activities, setActivities] = useState({
+  // 3. Aplicamos el tipo ActivityState al useState
+  const [activities, setActivities] = useState<ActivityState>({
     multiple_choice: true,
     true_false: true,
     drag_drop: true,
@@ -22,7 +41,8 @@ const ActivityEngine = ({ onNavigateToGames }: Props) => {
     timed_quiz: true,
   });
 
-  const categories = [
+  // 4. Tipamos el array de categorías
+  const categories: Category[] = [
     {
       id: 'choice',
       title: 'Multiple Choice',
@@ -120,7 +140,7 @@ const ActivityEngine = ({ onNavigateToGames }: Props) => {
       disabled: keys.filter(k => !activities[k]).length,
       aiCompatible: categories.flatMap(c => c.items).filter(i => i.ai && activities[i.id]).length
     };
-  }, [activities]);
+  }, [activities, categories]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -198,7 +218,7 @@ const ActivityEngine = ({ onNavigateToGames }: Props) => {
                     </button>
                   </div>
                 </div>
-))}
+              ))}
             </div>
           </div>
         ))}

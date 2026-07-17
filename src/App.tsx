@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './index.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -13,7 +13,7 @@ import HangmanExercise from './components/HangmanExercise'
 import DragDropExercise from './components/DragDropExercise'
 import TimerQuizExercise from './components/TimerQuizExercise'
 import AIConversationExercise from './components/AIConversationExercise'
-import { loginConGoogle, logout, estaAutenticado, obtenerUsuarioActual } from './services/authService'
+import { loginConGoogle, logout, obtenerUsuarioActual } from './services/authService'
 import { saveProgress, saveActivity, logEntrada, logSalida } from './services/sheetsService'
 
 interface SubtopicData {
@@ -39,21 +39,6 @@ interface BatchFeedback { summary: string; results: BatchResult[]; }
 type SkillTab = 'grammar' | 'vocabulary' | 'reading' | 'listening' | 'writing' | 'pronunciation';
 type MainTab = 'lesson' | 'settings' | 'progress' | 'library' | 'exam' | 'games';
 type GameType = 'true_false' | 'flashcards' | 'hangman' | 'drag_drop' | 'timer_quiz' | 'ai_conversation' | null;
-
-const mockProgress = {
-  moduleCompletion: 45, streakDays: 7, totalXp: 1250,
-  skills: [
-    { name: 'Grammar', value: 85, color: 'bg-blue-500' }, { name: 'Vocabulary', value: 70, color: 'bg-green-500' },
-    { name: 'Reading', value: 90, color: 'bg-purple-500' }, { name: 'Listening', value: 65, color: 'bg-yellow-500' },
-    { name: 'Speaking', value: 75, color: 'bg-pink-500' }, { name: 'Writing', value: 60, color: 'bg-indigo-500' },
-    { name: 'Pronunciation', value: 80, color: 'bg-red-500' },
-  ],
-  subtopics: [
-    { id: '1.1', title: 'Subject Pronouns & To Be', status: 'Completado', progress: 100 },
-    { id: '1.2', title: 'Negatives & Questions', status: 'En progreso', progress: 60 },
-    { id: '1.3', title: 'Wh- Questions & Possessives', status: 'Bloqueado', progress: 0 },
-  ]
-};
 
 function loadExerciseState(userEmail: string, subtopicId: string) {
   try {
@@ -115,10 +100,8 @@ function App() {
     return saved?.completedSkills || {};
   });
   const [evaluatingSkill, setEvaluatingSkill] = useState<string | null>(null);
-  const [highlightedRuleId, setHighlightedRuleId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MainTab>('lesson');
   const [skillTab, setSkillTab] = useState<SkillTab>('grammar');
-  const [visibleText, setVisibleText] = useState<{[key: string]: boolean}>({});
   const [audioState, setAudioState] = useState<{ isPlaying: boolean; text: string }>({ isPlaying: false, text: '' });
   const [userContext, setUserContext] = useState({ country: 'México', city: 'Ciudad de México', institutional_world: 'tecnm' });
   const [realProgress, setRealProgress] = useState<any>(null);
@@ -128,14 +111,22 @@ function App() {
   const [gameSkill, setGameSkill] = useState<string>('grammar');
   const [gameResults, setGameResults] = useState<{[key: string]: number}>({});
   const [navOpen, setNavOpen] = useState(false);
-  const [alternateExercises, setAlternateExercises] = useState<{[skill: string]: any}>({});
+  const [_alternateExercises, setAlternateExercises] = useState<{[skill: string]: any}>({});
   const [openExercises, setOpenExercises] = useState<{[key: string]: boolean}>({});
-  const [skillsCollapsed, setSkillsCollapsed] = useState(false);
   const recRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const [loadingAlternate, setLoadingAlternate] = useState<string | null>(null);
   const [isAlternateMode, setIsAlternateMode] = useState<{[skill: string]: boolean}>({});
   const userId = user?.email || 'anonymous';
+
+  // Variables locales seguras (evitan errores "possibly undefined")
+  const grammarExercises = data?.exercises?.grammar ?? [];
+  const vocabularyExercises = data?.exercises?.vocabulary ?? [];
+  const readingExercises = data?.exercises?.reading;
+  const listeningExercises = data?.exercises?.listening;
+  const writingExercises = data?.exercises?.writing ?? [];
+  const speakingExercises = data?.exercises?.speaking ?? [];
+  const pronunciationExercises = data?.exercises?.pronunciation ?? [];
 
   const loadAlternateExercises = async (skill: SkillTab) => {
     if (!data) return;
@@ -180,15 +171,6 @@ function App() {
       .catch(() => {});
   };
 
-  const getExercises = (skill: string) => {
-    if (isAlternateMode[skill] && alternateExercises[skill]) return alternateExercises[skill];
-    if (!data?.exercises) return [];
-    const exs = (data.exercises as any)[skill];
-    if (skill === 'reading') return exs ? [exs] : [];
-    if (skill === 'listening') return exs ? [exs] : [];
-    return exs || [];
-  };
-
   const handleLogin = async () => {
     setLoggingIn(true);
     const result = await loginConGoogle();
@@ -223,9 +205,8 @@ function App() {
     return '📝';
   };
 
-  const isExerciseOpen = (key: string, idx: number, total: number, fb: BatchResult | undefined): boolean => {
-    if (openExercises[key] !== undefined) return openExercises[key];
-    return false;
+  const isExerciseOpen = (key: string): boolean => {
+    return openExercises[key] === true;
   };
 
   const goToNextSkill = () => {
@@ -235,9 +216,9 @@ function App() {
       setSkillTab(skills[currentIdx + 1]);
       setOpenExercises({});
     } else {
-      const subIdx = subtopicsList.findIndex(s => s.id === currentSubtopicId);
+      const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId);
       if (subIdx >= 0 && subIdx < subtopicsList.length - 1) {
-        setCurrentSubtopicId(subtopicsList[subIdx + 1].id);
+        setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id);
       } else {
         setActiveTab('lesson');
       }
@@ -254,9 +235,7 @@ function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (user) {
-        logSalida('cierre_navegador');
-      }
+      if (user) logSalida('cierre_navegador');
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -298,22 +277,38 @@ function App() {
     setLoading(true);
     const worldParam = userContext.institutional_world;
     Promise.all([
-      fetch(`${API_BASE}/api/course/subtopic/${currentSubtopicId}?world=${worldParam}`).then(res => res.json()),
-      fetch(`${API_BASE}/api/course/progress/${userId}/subtopic/${currentSubtopicId}`).then(res => res.json())
+      fetch(`${API_BASE}/api/course/subtopic/${currentSubtopicId}?world=${worldParam}`)
+        .then(async (res) => {
+          const text = await res.text();
+          if (text.trim().startsWith('<!doctype') || text.trim().startsWith('<html')) {
+            console.error('[API] ⚠️ Backend devolvió HTML en /subtopic');
+            return null;
+          }
+          return JSON.parse(text);
+        }),
+      fetch(`${API_BASE}/api/course/progress/${userId}/subtopic/${currentSubtopicId}`)
+        .then(async (res) => {
+          const text = await res.text();
+          if (text.trim().startsWith('<!doctype') || text.trim().startsWith('<html')) {
+            console.error('[API] ⚠️ Backend devolvió HTML en /progress/subtopic');
+            return null;
+          }
+          return JSON.parse(text);
+        })
     ]).then(([topicData, progressData]) => {
-      setData(topicData);
+      if (topicData) setData(topicData);
       const dbCompleted: {[key: string]: boolean} = {};
       const dbAttempts: {[key: string]: number} = {};
-      Object.entries(progressData).forEach(([skill, info]: [string, any]) => {
-        dbAttempts[skill] = info.attempts || 0;
-        if (info.score >= 100) {
-          dbCompleted[skill] = true;
-        }
-      });
+      if (progressData && typeof progressData === 'object') {
+        Object.entries(progressData).forEach(([skill, info]: [string, any]) => {
+          dbAttempts[skill] = info.attempts || 0;
+          if (info.score >= 100) dbCompleted[skill] = true;
+        });
+      }
       const mergedCompleted = { ...dbCompleted };
       Object.keys(mergedCompleted).forEach(k => { if (!mergedCompleted[k]) delete mergedCompleted[k]; });
       const mergedAttempts: {[key: string]: number} = {};
-      ['grammar','vocabulary','reading','listening','writing','pronunciation'].forEach(s => {
+      (['grammar','vocabulary','reading','listening','writing','pronunciation'] as SkillTab[]).forEach(s => {
         mergedAttempts[s] = Math.max(saved?.attempts?.[s] || 0, dbAttempts[s] || 0);
       });
       setCompletedSkills(mergedCompleted);
@@ -325,9 +320,17 @@ function App() {
   useEffect(() => {
     if (!user) return;
     fetch(`${API_BASE}/api/course/progress/${userId}?world=${userContext.institutional_world}`)
-      .then(res => res.json())
-      .then(data => setRealProgress(data))
-      .catch(() => {});
+      .then(async (res) => {
+        const text = await res.text();
+        if (text.trim().startsWith('<!doctype') || text.trim().startsWith('<html')) {
+          console.error('[API] ⚠️ Backend devolvió HTML en /progress:', text.substring(0, 200));
+          return null;
+        }
+        try { return JSON.parse(text); }
+        catch { console.error('[API] ⚠️ Respuesta no es JSON válido:', text.substring(0, 200)); return null; }
+      })
+      .then(data => { if (data) setRealProgress(data); })
+      .catch((err) => { console.error('[API] ❌ Error en /progress:', err); });
   }, [user, userContext.institutional_world, activeTab, evaluatingSkill, userId]);
 
   useEffect(() => {
@@ -366,15 +369,6 @@ function App() {
     setBatchFeedbacks(prev => { const n = {...prev}; delete n[skill]; return n; });
   };
 
-  const resetSkill = (skill: SkillTab) => {
-    setAttempts(prev => ({ ...prev, [skill]: 0 }));
-    setCompletedSkills(prev => { const n = {...prev}; delete n[skill]; return n; });
-    setBatchFeedbacks(prev => { const n = {...prev}; delete n[skill]; return n; });
-    const newAnswers = {...selectedAnswers};
-    Object.keys(newAnswers).forEach(key => { if (key.startsWith(`${skill.charAt(0)}-`)) delete newAnswers[key]; });
-    setSelectedAnswers(newAnswers);
-  };
-
   const evaluateBatch = async (skill: SkillTab, exercises: any[]) => {
     const currentAttempts = attempts[skill] || 0;
     if (currentAttempts >= 2 || !exercises || exercises.length === 0) return;
@@ -384,9 +378,7 @@ function App() {
     const buildPayload = (exs: any[], offset: number) => exs.map((ex: any, i: number) => {
       const key = `${skill.charAt(0)}-${ex.id || (offset + i)}`;
       const isSpeaking = !!ex.prompt && !ex.answer && !ex.question;
-      let correctAnswer = isSpeaking
-        ? extractSpokenPhrase(ex.prompt)
-        : (ex.answer || ex.prompt || '');
+      let correctAnswer = isSpeaking ? extractSpokenPhrase(ex.prompt) : (ex.answer || ex.prompt || '');
       if (!isSpeaking && ex.question && ex.answer) {
         const fullCorrect = ex.question.replace(/_{2,}|\(\)/, ex.answer).replace(/\s+/g, ' ').trim();
         correctAnswer = `${correctAnswer} (Full correct sentence: "${fullCorrect}")`;
@@ -396,7 +388,6 @@ function App() {
 
     try {
       let combinedResult: any = { summary: '', results: [] };
-
       if (skill === 'pronunciation' && exercises.length > 6) {
         const batch1 = buildPayload(exercises.slice(0, 6), 0);
         const batch2 = buildPayload(exercises.slice(6), 6);
@@ -453,7 +444,7 @@ function App() {
   };
 
   const startRecording = (key: string) => {
-    if (audioState.isPlaying) { stopAudio(); }
+    if (audioState.isPlaying) stopAudio();
     // @ts-ignore
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { alert("Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge."); return; }
@@ -548,7 +539,6 @@ function App() {
                   </div>
                 )}
 
-                {/* MAPA DE RUTA A1 */}
                 {!realProgress.a1_achieved && (
                   <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-700 p-6 rounded-2xl shadow-lg">
                     <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">🗺️ Tu Camino hacia la Certificación A1</h3>
@@ -564,7 +554,6 @@ function App() {
                         </div>
                       </div>
                     </div>
-                    {/* Checklist de habilidades */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {Object.entries(realProgress.skill_stats || {}).map(([skill, stats]: [string, any]) => {
                         const thresholds: Record<string, number> = { grammar: 70, vocabulary: 70, reading: 60, listening: 60, writing: 60, pronunciation: 60 };
@@ -593,15 +582,14 @@ function App() {
                         );
                       })}
                     </div>
-                    {/* Siguiente paso */}
                     {(() => {
                       const thresholds: Record<string, number> = { grammar: 70, vocabulary: 70, reading: 60, listening: 60, writing: 60, pronunciation: 60 };
                       const icons: Record<string, string> = { grammar: '📝', vocabulary: '📚', reading: '📖', listening: '🎧', writing: '✍️', pronunciation: '🎤' };
                       const labels: Record<string, string> = { grammar: 'Grammar', vocabulary: 'Vocabulary', reading: 'Reading', listening: 'Listening', writing: 'Writing', pronunciation: 'Speaking' };
-                      const pending = Object.entries(realProgress.skill_stats || {}).filter(([skill, stats]: [string, any]) => !realProgress.a1_skills_passed?.[skill]);
+                      const pending = Object.entries(realProgress.skill_stats || {}).filter(([skill, _stats]: [string, any]) => !realProgress.a1_skills_passed?.[skill]);
                       if (pending.length === 0) return null;
                       const weakest = pending.sort((a, b) => ((a[1] as any).avg_score || 0) - ((b[1] as any).avg_score || 0))[0];
-                      const [worstSkill, worstStats] = weakest;
+                      const [worstSkill, worstStats] = weakest as [string, any];
                       const diff = (thresholds[worstSkill] || 60) - (worstStats.avg_score || 0);
                       return (
                         <div className="bg-slate-900/50 p-4 rounded-xl border border-amber-600 mt-4">
@@ -640,7 +628,7 @@ function App() {
                 <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                   <h3 className="text-lg font-bold text-white mb-4">📊 Detalle por Habilidad</h3>
                   <div className="space-y-4">
-                    {Object.entries(realProgress.skill_stats).map(([skill, stats]: [string, any]) => {
+                    {Object.entries(realProgress.skill_stats || {}).map(([skill, stats]: [string, any]) => {
                       const thresholds: Record<string, number> = { grammar: 70, vocabulary: 70, reading: 60, listening: 60, writing: 60, pronunciation: 60 };
                       const passed = realProgress.a1_skills_passed?.[skill] || false;
                       const threshold = thresholds[skill] || 60;
@@ -673,7 +661,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* ACCIONES RAPIDAS */}
                 <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
                   <h3 className="text-lg font-bold text-white mb-4">🚀 Acciones Rápidas</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -708,7 +695,7 @@ function App() {
               <h2 className="text-2xl font-bold text-amber-400 mb-2">📚 Librería del Módulo 1</h2>
               <p className="text-slate-300 text-sm">Referencia rápida de todo lo que necesitas saber en este nivel.</p>
             </div>
-            <LibraryPanel />
+            <LibraryPanel world={userContext.institutional_world} />
           </div>
         )}
 
@@ -734,18 +721,18 @@ function App() {
                   <input type="text" value={userContext.city} onChange={(e) => setUserContext({...userContext, city: e.target.value})} className="w-full bg-slate-800/80 text-white p-3 rounded-xl border border-blue-500/30 focus:border-blue-400 outline-none transition-all" placeholder="Ej. Monterrey, Puebla..." />
                 </div>
                 <div>
-                                      <label className="block text-blue-200 text-xs font-semibold mb-1.5 uppercase tracking-wider">Tu Institucion o Empresa</label>
-                    <select 
-                      value={userContext.institutional_world} 
-                      onChange={(e) => setUserContext({ ...userContext, institutional_world: e.target.value })}
-                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                    >
-                      <option value="tecnm">TecNM (Tecnologico Nacional)</option>
-                      <option value="empresa">Empresa Exportadora / PyME</option>
-                      <option value="usa_university">USA University</option>
-                      <option value="viajes">Viajes</option>
-                      <option value="vida_diaria">Vida Diaria</option>
-                    </select>
+                  <label className="block text-blue-200 text-xs font-semibold mb-1.5 uppercase tracking-wider">Tu Institucion o Empresa</label>
+                  <select 
+                    value={userContext.institutional_world} 
+                    onChange={(e) => setUserContext({ ...userContext, institutional_world: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                  >
+                    <option value="tecnm">TecNM (Tecnologico Nacional)</option>
+                    <option value="empresa">Empresa Exportadora / PyME</option>
+                    <option value="usa_university">USA University</option>
+                    <option value="viajes">Viajes</option>
+                    <option value="vida_diaria">Vida Diaria</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -775,7 +762,6 @@ function App() {
                   <p className="text-slate-300 text-sm">Practica inglés de forma divertida con juegos interactivos. ¡Usa el vocabulario y gramática de la lección actual!</p>
                 </div>
 
-                {/* SKILL SELECTOR */}
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                   <p className="text-sm text-slate-400 mb-3">Selecciona una habilidad para practicar:</p>
                   <div className="flex flex-wrap gap-2">
@@ -787,7 +773,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* GAME SELECTOR */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <button onClick={() => setGameType('true_false')} className="p-6 bg-slate-800 border border-slate-700 rounded-xl hover:border-green-500 hover:bg-green-900/20 transition-all text-left">
                     <p className="text-3xl mb-2">✅</p>
@@ -827,7 +812,6 @@ function App() {
                   </button>
                 </div>
 
-                {/* GAME RESULTS */}
                 {Object.keys(gameResults).length > 0 && (
                   <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                     <h3 className="text-white font-bold mb-3">📊 Resultados Recientes</h3>
@@ -844,12 +828,10 @@ function App() {
               </>
             ) : (
               <div className="space-y-6">
-                {/* BACK BUTTON */}
                 <button onClick={() => setGameType(null)} className="flex items-center gap-2 text-slate-400 hover:text-white transition-all">
                   ← Volver a Juegos
                 </button>
 
-                {/* GAME TITLE */}
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
                   <h3 className="text-white font-bold">
                     {gameType === 'true_false' && '✅ True / False'}
@@ -862,11 +844,10 @@ function App() {
                   <span className="text-slate-400 text-sm">{skillLabels.find(s => s.key === gameSkill)?.icon} {skillLabels.find(s => s.key === gameSkill)?.label}</span>
                 </div>
 
-                {/* GAME COMPONENTS */}
                 <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
-                  {gameType === 'true_false' && data?.exercises?.grammar && (
+                  {gameType === 'true_false' && grammarExercises.length > 0 && (
                     <TrueFalseExercise
-                      exercises={data.exercises.grammar}
+                      exercises={grammarExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, true_false: score });
                         saveProgress({ subtopicId: currentSubtopicId, skill: 'grammar', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
@@ -874,9 +855,9 @@ function App() {
                       }}
                     />
                   )}
-                  {gameType === 'flashcards' && data?.exercises?.vocabulary && (
+                  {gameType === 'flashcards' && vocabularyExercises.length > 0 && (
                     <FlashcardExercise
-                      exercises={data.exercises.vocabulary}
+                      exercises={vocabularyExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, flashcards: score });
                         saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
@@ -884,9 +865,9 @@ function App() {
                       }}
                     />
                   )}
-                  {gameType === 'hangman' && data?.exercises?.vocabulary && (
+                  {gameType === 'hangman' && vocabularyExercises.length > 0 && (
                     <HangmanExercise
-                      exercises={data.exercises.vocabulary}
+                      exercises={vocabularyExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, hangman: score });
                         saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
@@ -894,9 +875,9 @@ function App() {
                       }}
                     />
                   )}
-                  {gameType === 'drag_drop' && data?.exercises?.vocabulary && (
+                  {gameType === 'drag_drop' && vocabularyExercises.length > 0 && (
                     <DragDropExercise
-                      exercises={data.exercises.vocabulary}
+                      exercises={vocabularyExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, drag_drop: score });
                         saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
@@ -904,9 +885,9 @@ function App() {
                       }}
                     />
                   )}
-                  {gameType === 'timer_quiz' && data?.exercises?.grammar && (
+                  {gameType === 'timer_quiz' && grammarExercises.length > 0 && (
                     <TimerQuizExercise
-                      exercises={data.exercises.grammar}
+                      exercises={grammarExercises}
                       skill={gameSkill}
                       timePerQuestion={15}
                       onComplete={(score) => {
@@ -979,14 +960,14 @@ function App() {
                     <p className="text-slate-400 text-sm mb-6">Grammar ✅ Vocabulary ✅ Reading ✅ Listening ✅ Writing ✅ Speaking ✅</p>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                       <button onClick={() => {
-                        const subIdx = subtopicsList.findIndex(s => s.id === currentSubtopicId);
+                        const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId);
                         if (subIdx >= 0 && subIdx < subtopicsList.length - 1) {
-                          setCurrentSubtopicId(subtopicsList[subIdx + 1].id);
+                          setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id);
                         } else {
                           setActiveTab('lesson');
                         }
                       }} className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-green-900/50">
-                        {subtopicsList.findIndex(s => s.id === currentSubtopicId) < subtopicsList.length - 1 ? '➡️ Ir a la siguiente lección' : '🏠 Volver al panel principal'}
+                        {subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId) < subtopicsList.length - 1 ? '➡️ Ir a la siguiente lección' : '🏠 Volver al panel principal'}
                       </button>
                       <button onClick={() => setActiveTab('progress')} className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold text-base transition-all">
                         📊 Ver progreso
@@ -994,7 +975,6 @@ function App() {
                     </div>
                   </section>
                 ) : (
-
                 <section className="bg-slate-800 p-6 rounded-xl border border-purple-900/50 shadow-lg">
                   <h3 className="text-xl font-bold text-purple-400 mb-4">Práctica por Habilidad</h3>
                   <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-700 pb-3">
@@ -1002,7 +982,7 @@ function App() {
                   </div>
 
                   {/* GRAMMAR */}
-                  {skillTab === 'grammar' && data.exercises?.grammar && data.exercises.grammar.length > 0 && (
+                  {skillTab === 'grammar' && grammarExercises.length > 0 && (
                     isSkillPerfect('grammar') ? (
                       <div className="flex flex-col items-center justify-center py-16 px-4">
                         <div className="text-center p-10 bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl shadow-2xl max-w-lg w-full">
@@ -1023,14 +1003,14 @@ function App() {
                     ) : (
                     <div className="space-y-6">
                       <div className="space-y-2">
-                        {data.exercises.grammar.map((ex, idx) => {
+                        {grammarExercises.map((ex, idx) => {
                           const key = `g-${ex.id || idx}`;
                           const fb: BatchResult | undefined = batchFeedbacks['grammar']?.results[idx];
                           const currentAttempts = attempts['grammar'] || 0;
                           const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
                           const isUnscramble = ex.type === 'unscramble' && Array.isArray(ex.words) && ex.words.length > 0;
                           const hasOptions = ex.options && ex.options.length > 0;
-                          const open = isExerciseOpen(key, idx, data.exercises.grammar.length, fb);
+                          const open = isExerciseOpen(key);
                           const statusIcon = getExerciseIcon(fb, isLocked);
                           const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : '';
                           return (
@@ -1063,7 +1043,7 @@ function App() {
                                       <span className={`font-bold ${getScoreColor(fb.score)}`}>{fb.is_correct ? '✅ Correcto' : (currentAttempts === 1 ? '💡 Incorrecto, ¡intenta corregirlo!' : '💡 Necesita mejora')} - Puntaje: {fb.score}/100</span>
                                       <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
                                       {!fb.is_correct && fb.rule_hint && (
-                                        <button onClick={() => { setHighlightedRuleId(null); setTimeout(() => { setHighlightedRuleId(fb.rule_hint || null); setActiveTab('library'); }, 100); }} className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer">
+                                        <button onClick={() => { setTimeout(() => { setActiveTab('library'); }, 100); }} className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer">
                                           📖 Ver regla gramatical: {fb.rule_hint}
                                         </button>
                                       )}
@@ -1078,7 +1058,7 @@ function App() {
                         })}
                       </div>
                       {(attempts['grammar'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('grammar', data.exercises?.grammar || [])} disabled={evaluatingSkill === 'grammar'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
+                        <button onClick={() => evaluateBatch('grammar', grammarExercises)} disabled={evaluatingSkill === 'grammar'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
                           {evaluatingSkill === 'grammar' ? '🤖 Analizando...' : (attempts['grammar'] === 1 ? '🔄 Evaluar correcciones (Último intento)' : '🤖 Evaluar todo el bloque de Grammar con IA')}
                         </button>
                       ) : (
@@ -1090,7 +1070,6 @@ function App() {
                           <button onClick={() => loadAlternateExercises('grammar')} disabled={loadingAlternate === 'grammar' || !!completedSkills['grammar']} className={`repasar-btn-3d mt-3 ${completedSkills['grammar'] ? 'repasar-completed' : ''}`}>
                             {completedSkills['grammar'] ? '✅ Ejercicio completado' : (loadingAlternate === 'grammar' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
                           </button>
-
                         </div>
                       )}
                     </div>
@@ -1098,7 +1077,7 @@ function App() {
                   )}
 
                   {/* VOCABULARY */}
-                  {skillTab === 'vocabulary' && data.exercises?.vocabulary && data.exercises.vocabulary.length > 0 && (
+                  {skillTab === 'vocabulary' && vocabularyExercises.length > 0 && (
                     isSkillPerfect('vocabulary') ? (
                       <div className="flex flex-col items-center justify-center py-16 px-4">
                         <div className="text-center p-10 bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl shadow-2xl max-w-lg w-full">
@@ -1125,34 +1104,34 @@ function App() {
                           <p className="text-yellow-400 text-xs font-semibold mb-1">💡 Nota importante:</p>
                           <p className="text-slate-300 text-xs">El texto y el audio presentan situaciones diferentes para que practiques más vocabulario. ¡No son el mismo contenido!</p>
                         </div>
-                        {data.exercises?.reading?.text && (
+                        {readingExercises?.text && (
                           <div className="mb-4">
                             <div className="flex items-center gap-2 mb-2"><span className="text-green-400 font-semibold text-sm">📖 Texto de Lectura:</span></div>
-                            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-700"><p className="text-slate-200 leading-relaxed text-sm">{adaptText(data.exercises.reading.text)}</p></div>
+                            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-700"><p className="text-slate-200 leading-relaxed text-sm">{adaptText(readingExercises.text)}</p></div>
                           </div>
                         )}
-                        {data.exercises?.listening?.script && (
+                        {listeningExercises?.script && (
                           <div className="mb-4">
                             <div className="flex items-center gap-2 mb-2"><span className="text-purple-400 font-semibold text-sm">🎧 Audio de Listening (contenido diferente):</span></div>
                             <div className="flex items-center gap-4 bg-slate-900/60 p-4 rounded-lg border border-slate-700">
                               <div className="flex gap-2">
-                                <button onClick={() => speak(data.exercises?.listening?.script || '')} className={`px-4 py-2 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === (data.exercises?.listening?.script || '') ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
-                                  {audioState.isPlaying && audioState.text === (data.exercises?.listening?.script || '') ? '⏸️ Pausar' : '▶️ Play'}
+                                <button onClick={() => speak(listeningExercises.script || '')} className={`px-4 py-2 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === (listeningExercises.script || '') ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
+                                  {audioState.isPlaying && audioState.text === (listeningExercises.script || '') ? '⏸️ Pausar' : '▶️ Play'}
                                 </button>
-                                {audioState.text === (data.exercises?.listening?.script || '') && <button onClick={stopAudio} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">⏹️ Stop</button>}
+                                {audioState.text === (listeningExercises.script || '') && <button onClick={stopAudio} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">⏹️ Stop</button>}
                               </div>
-                              <div className="flex-1"><p className="text-slate-400 text-xs italic">"{adaptText(data.exercises.listening.script)}"</p></div>
+                              <div className="flex-1"><p className="text-slate-400 text-xs italic">"{adaptText(listeningExercises.script)}"</p></div>
                             </div>
                           </div>
                         )}
                       </div>
                       <div className="space-y-2">
-                        {data.exercises.vocabulary.map((ex, idx) => {
+                        {vocabularyExercises.map((ex, idx) => {
                           const key = `v-${ex.id || idx}`;
                           const fb: BatchResult | undefined = batchFeedbacks['vocabulary']?.results[idx];
                           const currentAttempts = attempts['vocabulary'] || 0;
                           const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                          const open = isExerciseOpen(key, idx, data.exercises.vocabulary.length, fb);
+                          const open = isExerciseOpen(key);
                           const statusIcon = getExerciseIcon(fb, isLocked);
                           const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : '';
                           return (
@@ -1175,7 +1154,7 @@ function App() {
                         })}
                       </div>
                       {(attempts['vocabulary'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('vocabulary', data.exercises?.vocabulary || [])} disabled={evaluatingSkill === 'vocabulary'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
+                        <button onClick={() => evaluateBatch('vocabulary', vocabularyExercises)} disabled={evaluatingSkill === 'vocabulary'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
                           {evaluatingSkill === 'vocabulary' ? '🤖 Analizando...' : (attempts['vocabulary'] === 1 ? '🔄 Evaluar correcciones (Último intento)' : '🤖 Evaluar todo el bloque de Vocabulary con IA')}
                         </button>
                       ) : (
@@ -1187,7 +1166,6 @@ function App() {
                           <button onClick={() => loadAlternateExercises('vocabulary')} disabled={loadingAlternate === 'vocabulary' || !!completedSkills['vocabulary']} className={`repasar-btn-3d mt-3 ${completedSkills['vocabulary'] ? 'repasar-completed' : ''}`}>
                             {completedSkills['vocabulary'] ? '✅ Ejercicio completado' : (loadingAlternate === 'vocabulary' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
                           </button>
-
                         </div>
                       )}
                     </div>
@@ -1195,7 +1173,7 @@ function App() {
                   )}
 
                   {/* READING */}
-                  {skillTab === 'reading' && data.exercises?.reading && (
+                  {skillTab === 'reading' && readingExercises && readingExercises.questions && readingExercises.questions.length > 0 && (
                     isSkillPerfect('reading') ? (
                       <div className="flex flex-col items-center justify-center py-16 px-4">
                         <div className="text-center p-10 bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl shadow-2xl max-w-lg w-full">
@@ -1218,20 +1196,20 @@ function App() {
                       <div className="bg-gradient-to-r from-green-900/40 to-teal-900/40 border border-green-700 p-6 rounded-xl">
                         <h4 className="text-green-400 font-semibold mb-3 flex items-center gap-2"><span>📖</span> Texto de Lectura</h4>
                         <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-700">
-                          <p className="text-slate-200 leading-relaxed">{adaptText(data.exercises.reading.text)}</p>
+                          <p className="text-slate-200 leading-relaxed">{adaptText(readingExercises.text)}</p>
                         </div>
-                        <button onClick={() => speak(data.exercises!.reading!.text)} className={`mt-4 px-4 py-2 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === data.exercises!.reading!.text ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'} text-white`}>
-                          {audioState.isPlaying && audioState.text === data.exercises!.reading!.text ? '⏸️ Pausar' : '🔊 Escuchar texto'}
+                        <button onClick={() => speak(readingExercises.text)} className={`mt-4 px-4 py-2 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === readingExercises.text ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700'} text-white`}>
+                          {audioState.isPlaying && audioState.text === readingExercises.text ? '⏸️ Pausar' : '🔊 Escuchar texto'}
                         </button>
                       </div>
                       <div className="space-y-2">
                         <h4 className="text-green-400 font-semibold">Preguntas de Comprensión</h4>
-                        {data.exercises.reading.questions.map((q, idx) => {
+                        {readingExercises.questions.map((q, idx) => {
                           const key = `r-${q.id || idx}`;
                           const fb: BatchResult | undefined = batchFeedbacks['reading']?.results[idx];
                           const currentAttempts = attempts['reading'] || 0;
                           const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                          const open = isExerciseOpen(key, idx, data.exercises.reading.questions.length, fb);
+                          const open = isExerciseOpen(key);
                           const statusIcon = getExerciseIcon(fb, isLocked);
                           const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : '';
                           return (
@@ -1268,8 +1246,8 @@ function App() {
                       </div>
                       {(attempts['reading'] || 0) < 2 ? (
                         <button onClick={() => {
-                          const qs = data.exercises!.reading!.questions;
-                          evaluateBatch('reading', qs.map((q, i) => ({ question: q.question, answer: q.answer, id: q.id })));
+                          const qs = readingExercises.questions;
+                          evaluateBatch('reading', qs.map((q: any) => ({ question: q.question, answer: q.answer, id: q.id })));
                         }} disabled={evaluatingSkill === 'reading'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
                           {evaluatingSkill === 'reading' ? '🤖 Analizando...' : '🤖 Evaluar comprensión lectora con IA'}
                         </button>
@@ -1282,7 +1260,6 @@ function App() {
                           <button onClick={() => loadAlternateExercises('reading')} disabled={loadingAlternate === 'reading' || !!completedSkills['reading']} className={`repasar-btn-3d mt-3 ${completedSkills['reading'] ? 'repasar-completed' : ''}`}>
                             {completedSkills['reading'] ? '✅ Ejercicio completado' : (loadingAlternate === 'reading' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
                           </button>
-
                         </div>
                       )}
                     </div>
@@ -1290,7 +1267,7 @@ function App() {
                   )}
 
                   {/* LISTENING */}
-                  {skillTab === 'listening' && data.exercises?.listening && (
+                  {skillTab === 'listening' && listeningExercises && listeningExercises.questions && listeningExercises.questions.length > 0 && (
                     isSkillPerfect('listening') ? (
                       <div className="flex flex-col items-center justify-center py-16 px-4">
                         <div className="text-center p-10 bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl shadow-2xl max-w-lg w-full">
@@ -1314,18 +1291,18 @@ function App() {
                         <h4 className="text-purple-400 font-semibold mb-3 flex items-center gap-2"><span>🎧</span> Audio de Listening</h4>
                         <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-700">
                           <p className="text-slate-400 text-xs italic mb-3">Escucha el audio y responde las preguntas:</p>
-                          <p className="text-slate-200 leading-relaxed italic">"{adaptText(data.exercises.listening.script)}"</p>
+                          <p className="text-slate-200 leading-relaxed italic">"{adaptText(listeningExercises.script)}"</p>
                         </div>
                         <div className="flex gap-3 mt-4">
-                          <button onClick={() => speak(data.exercises!.listening!.script)} className={`px-4 py-2 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === data.exercises!.listening!.script ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
-                            {audioState.isPlaying && audioState.text === data.exercises!.listening!.script ? '⏸️ Pausar' : '▶️ Play'}
+                          <button onClick={() => speak(listeningExercises.script)} className={`px-4 py-2 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === listeningExercises.script ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
+                            {audioState.isPlaying && audioState.text === listeningExercises.script ? '⏸️ Pausar' : '▶️ Play'}
                           </button>
-                          {audioState.text === data.exercises!.listening!.script && <button onClick={stopAudio} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">⏹️ Stop</button>}
+                          {audioState.text === listeningExercises.script && <button onClick={stopAudio} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">⏹️ Stop</button>}
                         </div>
                       </div>
                       <div className="space-y-4">
                         <h4 className="text-purple-400 font-semibold">Preguntas de Listening</h4>
-                        {data.exercises.listening.questions.map((q, idx) => {
+                        {listeningExercises.questions.map((q, idx) => {
                           const key = `l-${q.id || idx}`;
                           const fb: BatchResult | undefined = batchFeedbacks['listening']?.results[idx];
                           const currentAttempts = attempts['listening'] || 0;
@@ -1336,8 +1313,8 @@ function App() {
                               <div className="flex gap-2 flex-wrap">
                                 {q.options.map((opt, i) => (
                                   <button key={i} onClick={() => !isLocked && handleAnswerSelect(key, opt)} disabled={isLocked}
-  className={`exercise-opt-3d ${isLocked ? 'exercise-opt-locked' : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
->{opt}</button>
+                                    className={`exercise-opt-3d ${isLocked ? 'exercise-opt-locked' : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
+                                  >{opt}</button>
                                 ))}
                               </div>
                               {fb && (
@@ -1353,8 +1330,8 @@ function App() {
                       </div>
                       {(attempts['listening'] || 0) < 2 ? (
                         <button onClick={() => {
-                          const qs = data.exercises!.listening!.questions;
-                          evaluateBatch('listening', qs.map((q, i) => ({ question: q.question, answer: q.answer, id: q.id })));
+                          const qs = listeningExercises.questions;
+                          evaluateBatch('listening', qs.map((q: any) => ({ question: q.question, answer: q.answer, id: q.id })));
                         }} disabled={evaluatingSkill === 'listening'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
                           {evaluatingSkill === 'listening' ? '🤖 Analizando...' : '🤖 Evaluar listening con IA'}
                         </button>
@@ -1367,7 +1344,6 @@ function App() {
                           <button onClick={() => loadAlternateExercises('listening')} disabled={loadingAlternate === 'listening' || !!completedSkills['listening']} className={`repasar-btn-3d mt-3 ${completedSkills['listening'] ? 'repasar-completed' : ''}`}>
                             {completedSkills['listening'] ? '✅ Ejercicio completado' : (loadingAlternate === 'listening' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
                           </button>
-
                         </div>
                       )}
                     </div>
@@ -1375,7 +1351,7 @@ function App() {
                   )}
 
                   {/* WRITING */}
-                  {skillTab === 'writing' && data.exercises?.writing && data.exercises.writing.length > 0 && (
+                  {skillTab === 'writing' && writingExercises.length > 0 && (
                     isSkillPerfect('writing') ? (
                       <div className="flex flex-col items-center justify-center py-16 px-4">
                         <div className="text-center p-10 bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl shadow-2xl max-w-lg w-full">
@@ -1401,7 +1377,7 @@ function App() {
                       </div>
                       <WritingRulesPanel />
                       <div className="space-y-4">
-                        {data.exercises.writing.map((ex, idx) => {
+                        {writingExercises.map((ex, idx) => {
                           const key = `w-${ex.id || idx}`;
                           const fb: BatchResult | undefined = batchFeedbacks['writing']?.results[idx];
                           const currentAttempts = attempts['writing'] || 0;
@@ -1427,7 +1403,7 @@ function App() {
                         })}
                       </div>
                       {(attempts['writing'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('writing', data.exercises!.writing || [])} disabled={evaluatingSkill === 'writing'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
+                        <button onClick={() => evaluateBatch('writing', writingExercises)} disabled={evaluatingSkill === 'writing'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
                           {evaluatingSkill === 'writing' ? '🤖 Analizando...' : '🤖 Evaluar escritura con IA'}
                         </button>
                       ) : (
@@ -1439,7 +1415,6 @@ function App() {
                           <button onClick={() => loadAlternateExercises('writing')} disabled={loadingAlternate === 'writing' || !!completedSkills['writing']} className={`repasar-btn-3d mt-3 ${completedSkills['writing'] ? 'repasar-completed' : ''}`}>
                             {completedSkills['writing'] ? '✅ Ejercicio completado' : (loadingAlternate === 'writing' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
                           </button>
-
                         </div>
                       )}
                     </div>
@@ -1447,7 +1422,7 @@ function App() {
                   )}
 
                   {/* SPEAKING / PRONUNCIATION */}
-                  {skillTab === 'pronunciation' && data.exercises?.pronunciation && data.exercises.pronunciation.length > 0 && (
+                  {skillTab === 'pronunciation' && pronunciationExercises.length > 0 && (
                     isSkillPerfect('pronunciation') ? (
                       <div className="flex flex-col items-center justify-center py-16 px-4">
                         <div className="text-center p-10 bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl shadow-2xl max-w-lg w-full">
@@ -1471,15 +1446,15 @@ function App() {
                         <h4 className="text-pink-400 font-semibold mb-3 flex items-center gap-2"><span>🎤</span> Pronunciación y Speaking</h4>
                         <p className="text-slate-300 text-sm">Practica la pronunciación y graba tu voz para ser evaluada.</p>
                       </div>
-                      {data.exercises.speaking && data.exercises.speaking.length > 0 && (
+                      {speakingExercises.length > 0 && (
                         <div className="space-y-2">
                           <h4 className="text-pink-400 font-semibold">Speaking - Practica tu voz</h4>
-                          {data.exercises.speaking.map((ex, idx) => {
+                          {speakingExercises.map((ex, idx) => {
                             const key = `p-${ex.id || idx}`;
                             const fb: BatchResult | undefined = batchFeedbacks['pronunciation']?.results[idx];
                             const currentAttempts = attempts['pronunciation'] || 0;
                             const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                            const open = isExerciseOpen(key, idx, data.exercises.speaking.length, fb);
+                            const open = isExerciseOpen(key);
                             const statusIcon = getExerciseIcon(fb, isLocked);
                             const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : (recordingKey === key ? 'accordion-partial' : '');
                             return (
@@ -1527,9 +1502,9 @@ function App() {
                       )}
                       <div className="space-y-2">
                         <h4 className="text-pink-400 font-semibold">Pronunciación - Tips</h4>
-                        {data.exercises.pronunciation.map((ex, idx) => {
+                        {pronunciationExercises.map((ex, idx) => {
                           const key = `pron-tip-${idx}`;
-                          const open = isExerciseOpen(key, idx, data.exercises.pronunciation.length, undefined);
+                          const open = isExerciseOpen(key);
                           return (
                             <div key={idx}>
                               <div className={`accordion-header`} onClick={() => toggleExercise(key)}>
@@ -1551,7 +1526,7 @@ function App() {
                         })}
                       </div>
                       {(attempts['pronunciation'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('pronunciation', data.exercises!.speaking || [])} disabled={evaluatingSkill === 'pronunciation'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
+                        <button onClick={() => evaluateBatch('pronunciation', speakingExercises)} disabled={evaluatingSkill === 'pronunciation'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
                           {evaluatingSkill === 'pronunciation' ? '🤖 Analizando...' : '🤖 Evaluar speaking con IA'}
                         </button>
                       ) : (
@@ -1563,14 +1538,11 @@ function App() {
                           <button onClick={() => loadAlternateExercises('pronunciation')} disabled={loadingAlternate === 'pronunciation' || !!completedSkills['pronunciation']} className={`repasar-btn-3d mt-3 ${completedSkills['pronunciation'] ? 'repasar-completed' : ''}`}>
                             {completedSkills['pronunciation'] ? '✅ Ejercicio completado' : (loadingAlternate === 'pronunciation' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
                           </button>
-
                         </div>
                       )}
                     </div>
                   )
                   )}
-
-
                 </section>
                 )}
               </>
@@ -1587,10 +1559,3 @@ function App() {
   )
 }
 export default App
-
-
-
-
-
-
-
