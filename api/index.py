@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     VITE_API_URL: str = ""
 
-    # Busca el archivo .env en la carpeta raíz (un nivel arriba de 'api')
     model_config = ConfigDict(
         env_file=os.path.join(os.path.dirname(__file__), "..", ".env"),
         extra="ignore"
