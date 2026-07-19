@@ -13,6 +13,7 @@ import HangmanExercise from './components/HangmanExercise'
 import DragDropExercise from './components/DragDropExercise'
 import TimerQuizExercise from './components/TimerQuizExercise'
 import AIConversationExercise from './components/AIConversationExercise'
+import OnboardingFlow from './components/Onboarding/OnboardingFlow';
 import { loginConGoogle, logout, obtenerUsuarioActual } from './services/authService'
 import { saveProgress, saveActivity, logEntrada, logSalida } from './services/sheetsService'
 
@@ -111,13 +112,92 @@ function App() {
   const [gameSkill, setGameSkill] = useState<string>('grammar');
   const [gameResults, setGameResults] = useState<{[key: string]: number}>({});
   const [navOpen, setNavOpen] = useState(false);
+  const [showOnboardingManual, setShowOnboardingManual] = useState(false);
   const [_alternateExercises, setAlternateExercises] = useState<{[skill: string]: any}>({});
   const [openExercises, setOpenExercises] = useState<{[key: string]: boolean}>({});
   const recRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const [loadingAlternate, setLoadingAlternate] = useState<string | null>(null);
   const [isAlternateMode, setIsAlternateMode] = useState<{[skill: string]: boolean}>({});
+  
+  // Estados para el Modal de Ayuda
+  const [showHelp, setShowHelp] = useState(false);
+  const [currentHelpType, setCurrentHelpType] = useState<string>('grammar');
+
+  const openHelp = (type: string) => {
+    setCurrentHelpType(type);
+    setShowHelp(true);
+  };
+
   const userId = user?.email || 'anonymous';
+
+  // ==========================================
+  // DICCIONARIO DE INSTRUCCIONES POR HABILIDAD/JUEGO
+  // ==========================================
+  const helpInstructions: Record<string, { title: string; instructions: string[] }> = {
+    grammar: {
+      title: "Cómo funciona: Grammar",
+      instructions: [
+        "Lee la oración o pregunta cuidadosamente.",
+        "Selecciona la opción correcta o toca las palabras del banco para ordenar la oración.",
+        "Al terminar, presiona el botón morado 'Evaluar todo el bloque con IA'.",
+        "La IA te dirá si está bien o te dará una pista. ¡Tienes 2 intentos!",
+        "Si te equivocas, revisa la 'Regla gramatical' que te sugiere la IA."
+      ]
+    },
+    vocabulary: {
+      title: "Cómo funciona: Vocabulary",
+      instructions: [
+        "Primero, lee el texto y escucha el audio de referencia (si está disponible).",
+        "Responde las preguntas escribiendo o seleccionando la palabra en inglés.",
+        "Presta mucha atención a la ortografía (spelling).",
+        "Presiona 'Evaluar' para que la IA revise tus respuestas."
+      ]
+    },
+    reading: {
+      title: "Cómo funciona: Reading",
+      instructions: [
+        "Lee el texto completo con calma. Puedes usar el botón '🔊 Escuchar texto'.",
+        "Las preguntas aparecen abajo. Selecciona la opción que mejor responda según el texto.",
+        "No necesitas saber todas las palabras, busca las ideas principales."
+      ]
+    },
+    listening: {
+      title: "Cómo funciona: Listening",
+      instructions: [
+        "Presiona '▶️ Play' para escuchar el diálogo o texto. Puedes pausarlo y repetirlo.",
+        "Las preguntas están abajo. Elige la opción correcta basada en lo que escuchaste.",
+        "Consejo: Anota mentalmente nombres, lugares o números mientras escuchas."
+      ]
+    },
+    writing: {
+      title: "Cómo funciona: Writing",
+      instructions: [
+        "Ordena las palabras para formar una oración correcta o escribe tu propia respuesta.",
+        "Recuerda: Inicia con mayúscula y termina con punto (.)",
+        "La IA evaluará tu gramática y te dará retroalimentación detallada.",
+        "¡No copies la respuesta del ejercicio, intenta escribirlo tú!"
+      ]
+    },
+    pronunciation: {
+      title: "Cómo funciona: Speaking / Pronunciation",
+      instructions: [
+        "Presiona '🔊 Escuchar' para saber cómo debe sonar la frase.",
+        "Presiona '🎤 Grabar' y lee la frase en voz alta y con claridad.",
+        "El navegador te pedirá permiso para usar el micrófono la primera vez. Acepta.",
+        "La IA comparará tu audio con la frase original y te dará un puntaje."
+      ]
+    },
+    games: {
+      title: "Cómo funcionan los Mini-Juegos",
+      instructions: [
+        "Elige una habilidad (Grammar, Vocabulary, etc.) en la parte superior.",
+        "Selecciona el tipo de juego que prefieras (Flashcards, Hangman, Quiz, etc.).",
+        "Los juegos son prácticos y sin límite de intentos. ¡Diviértete aprendiendo!",
+        "Tu puntaje se guardará en tu historial de resultados."
+      ]
+    }
+  };
 
   // Variables locales seguras (evitan errores "possibly undefined")
   const grammarExercises = data?.exercises?.grammar ?? [];
@@ -182,6 +262,10 @@ function App() {
   };
 
   const handleLogout = () => { logSalida('cerrar_sesion'); logout(); setUser(null); };
+  
+  const openOnboarding = () => {
+    setShowOnboardingManual(true);
+  };
 
   const isSkillPerfect = (skill: string): boolean => {
     const fb = batchFeedbacks[skill];
@@ -349,15 +433,40 @@ function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="panel-header-3d panel-header-blue p-8 max-w-md w-full text-center">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 max-w-md w-full text-center">
           <h1 className="text-3xl font-bold text-blue-500 mb-2">TECLINGO AI</h1>
           <p className="text-slate-400 mb-6">Nivel A1 - Curso de Inglés</p>
-          <button onClick={handleLogin} disabled={loggingIn}
-            className="action-btn-3d action-btn-blue w-full py-3 text-lg disabled:opacity-50 justify-center">
-            {loggingIn ? (<><span className="animate-spin">⏳</span> Conectando con Google...</>) : (<>🔑 Iniciar sesión con Google</>)}
+          
+          <button 
+            onClick={handleLogin} 
+            disabled={loggingIn}
+            className="w-full py-3 bg-white text-slate-800 rounded-lg font-bold text-lg hover:bg-slate-100 disabled:opacity-50 flex items-center justify-center gap-3 mb-4 transition-all"
+          >
+            {loggingIn ? <><span className="animate-spin">⏳</span> Conectando...</> : <>🔑 Iniciar sesión con Google</>}
           </button>
-          <p className="text-slate-500 text-xs mt-4">Tu progreso se guarda automáticamente</p>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-600"></span></div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-slate-800 px-3 text-slate-400 font-semibold">O para desarrollo local</span>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
+              setUser(mockUser);
+              localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
+            }}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 flex items-center justify-center gap-3 transition-all shadow-lg shadow-blue-900/50"
+          >
+            🚀 Entrar en Modo de Prueba (Sin Google)
+          </button>
+
+          <p className="text-slate-500 text-xs mt-6 leading-relaxed">
+            ⚠️ El botón de Google fallará con el error <code className="bg-slate-700 px-1 rounded">_.Cd</code> si no tienes un archivo <code className="bg-slate-700 px-1 rounded">.env</code> con tu <code className="bg-slate-700 px-1 rounded">VITE_GOOGLE_CLIENT_ID</code>.
+          </p>
         </div>
       </div>
     );
@@ -489,6 +598,10 @@ function App() {
   ];
 
   if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-xl">Cargando TECLINGO AI...</div>;
+  
+  if (showOnboardingManual && user) {
+    return <OnboardingFlow userEmail={user.email} onComplete={() => setShowOnboardingManual(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
@@ -511,6 +624,16 @@ function App() {
               <button onClick={() => { setActiveTab('settings'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'settings' ? 'nav-active-purple' : 'nav-btn-inactive'}`}><span className="nav-icon">⚙️</span> Ajustes</button>
               <button onClick={() => { setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`}><span className="nav-icon">📝</span> Examen</button>
               <button onClick={() => { setActiveTab('games'); setGameType(null); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'games' ? 'nav-active-pink' : 'nav-btn-inactive'}`}><span className="nav-icon">🎮</span> Juegos</button>
+              <button
+                onClick={openOnboarding}
+                className="nav-btn-3d relative overflow-hidden group bg-gradient-to-r from-pink-500 to-orange-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg hover:shadow-pink-500/50 transition-all duration-300 transform hover:scale-105"
+              >
+                <span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xl">🧠</span>
+                  <span className="text-sm">Descubre tu ADN</span>
+                </span>
+              </button>
               <button onClick={() => { handleLogout(); setNavOpen(false); }} className="nav-btn-3d nav-btn-logout">Salir</button>
             </div>
           </div>
@@ -522,6 +645,12 @@ function App() {
               <button onClick={() => { setActiveTab('settings'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'settings' ? 'nav-active-purple' : 'nav-btn-inactive'}`}><span className="nav-icon">⚙️</span> Ajustes</button>
               <button onClick={() => { setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`}><span className="nav-icon">📝</span> Examen</button>
               <button onClick={() => { setActiveTab('games'); setGameType(null); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'games' ? 'nav-active-pink' : 'nav-btn-inactive'}`}><span className="nav-icon">🎮</span> Juegos</button>
+              <button
+                onClick={() => { openOnboarding(); setNavOpen(false); }}
+                className="nav-btn-3d bg-gradient-to-r from-pink-500 to-orange-500 text-white font-bold col-span-2"
+              >
+                🧠 Descubre tu ADN
+              </button>
               <button onClick={() => { handleLogout(); setNavOpen(false); }} className="nav-btn-3d nav-btn-logout" style={{ gridColumn: 'span 2' }}>Cerrar sesión</button>
             </div>
           </div>
@@ -983,8 +1112,23 @@ function App() {
                 ) : (
                 <section className="panel-3d panel-header-purple p-6">
                   <h3 className="text-xl font-bold text-purple-400 mb-4">Práctica por Habilidad</h3>
+<<<<<<< HEAD
                   <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-700/50 pb-3">
                     {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`skill-tab-3d ${skillTab === s.key ? 'skill-tab-active' : 'skill-tab-inactive'}`}>{s.icon} {s.label}</button>))}
+=======
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-wrap gap-2 border-b border-slate-700 pb-3">
+                      {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`px-3 py-2 rounded-lg text-sm font-medium ${skillTab === s.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{s.icon} {s.label}</button>))}
+                    </div>
+                    <button 
+                      onClick={() => openHelp(skillTab)} 
+                      className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-blue-400 rounded-lg text-sm font-semibold transition-all border border-slate-600 hover:border-blue-500"
+                      title="Ver instrucciones de esta sección"
+                    >
+                      <span className="text-lg">❓</span>
+                      <span className="hidden sm:inline">¿Cómo funciona?</span>
+                    </button>
+>>>>>>> 6640a4b (feat: add onboarding flow, ADN router, and compressed video assets)
                   </div>
 
                   {/* GRAMMAR */}
@@ -1561,7 +1705,69 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* MODAL DE AYUDA GLOBAL (Corregido: ahora está dentro del return de App) */}
+      <HelpModal 
+        isOpen={showHelp} 
+        onClose={() => setShowHelp(false)} 
+        title={helpInstructions[currentHelpType]?.title || "Ayuda"}
+        instructions={helpInstructions[currentHelpType]?.instructions || ["Instrucciones no disponibles."]}
+      />
     </div>
-  )
+  );
 }
-export default App
+
+// ==========================================
+// COMPONENTE: MODAL DE AYUDA / INSTRUCCIONES
+// ==========================================
+interface HelpModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  instructions: string[];
+}
+
+function HelpModal({ isOpen, onClose, title, instructions }: HelpModalProps) {
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    if (isOpen) window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div 
+        className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6 relative animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors p-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+        
+        <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+          <span className="text-2xl">❓</span> {title}
+        </h3>
+        
+        <ul className="space-y-3 mb-6">
+          {instructions.map((inst, i) => (
+            <li key={i} className="flex gap-3 text-slate-300 text-sm leading-relaxed">
+              <span className="text-blue-500 font-bold mt-0.5 shrink-0">•</span>
+              <span>{inst}</span>
+            </li>
+          ))}
+        </ul>
+        
+        <button 
+          onClick={onClose} 
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-900/50"
+        >
+          ¡Entendido, a practicar!
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default App;

@@ -12,3 +12,6 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+*.bak
+repomix-output.xml
+ruta

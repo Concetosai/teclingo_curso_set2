@@ -195,7 +195,7 @@ Return a JSON object with this EXACT structure:
 tutor = TutorService()
 
 # ==========================================
-# FASTAPI APP + ROUTER
+# FASTAPI APP + ROUTER (Course + ADN)
 # ==========================================
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 COURSE_CONTENT_PATH = os.path.join(DATA_DIR, "course_content.json")
@@ -222,6 +222,7 @@ def _call_gas(action: str, data: dict = None) -> dict:
 
 course_data = _load_course_content()
 
+# ================== PYDANTIC MODELS ==================
 class FeedbackRequest(BaseModel):
     question: str
     user_answer: str
@@ -253,6 +254,22 @@ class ExamAnswerRequest(BaseModel):
     world: str
     answers: List[dict]
 
+# ========== MODELO ADN (Nuevo) ==========
+class ADNData(BaseModel):
+    email: str
+    confianza: str
+    nivel: str
+    motivo: str
+    meta_3m: str
+    urgencia: str
+    temas: str
+    formato: str
+    estilo_sesion: str
+    correccion: str
+    horario: str
+    minutos_dia: str
+
+# ================== APPS Y ROUTERS ==================
 app = FastAPI(
     title="TECLINGO AI Engine",
     version="1.0.0",
@@ -267,6 +284,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---- Router para el Curso ----
 router = APIRouter(prefix="/api/course", tags=["Course"])
 
 @router.get("/module/{module_id}/subtopics")
@@ -373,8 +391,40 @@ def get_subtopic_progress(user_id: str, subtopic_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-app.include_router(router)
+# ---- Router para ADN (Nuevo) ----
+adn_router = APIRouter(prefix="/api/adn", tags=["ADN"])
 
+@adn_router.post("/save")
+def save_adn(data: ADNData):
+    try:
+        result = _call_gas("guardarADN", data.dict())
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail=result["error"])
+        return {"status": "saved"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@adn_router.get("/{email}")
+def get_adn(email: str):
+    try:
+        result = _call_gas("obtenerADN", {"email": email})
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail=result["error"])
+        if not result.get("data"):
+            raise HTTPException(status_code=404, detail="ADN no encontrado")
+        return result["data"]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---- Incluir routers ----
+app.include_router(router)
+app.include_router(adn_router)
+
+# ================== ENDPOINTS PÚBLICOS ==================
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "version": "1.0.0"}
