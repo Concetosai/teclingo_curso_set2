@@ -115,6 +115,15 @@ function App() {
   const [showOnboardingManual, setShowOnboardingManual] = useState(false);
   const [_alternateExercises, setAlternateExercises] = useState<{[skill: string]: any}>({});
   const [openExercises, setOpenExercises] = useState<{[key: string]: boolean}>({});
+  const [showScrollHint, setShowScrollHint] = useState(() => {
+    return localStorage.getItem('teclingo_hide_scroll_hint') !== 'true';
+  });
+  const [showGuestAlert, setShowGuestAlert] = useState(false);
+  const [pendingLessonId, setPendingLessonId] = useState<string | null>(null);
+  const [showHelpHint, setShowHelpHint] = useState(() => {
+    return localStorage.getItem('teclingo_hide_help_hint') !== 'true';
+  });
+  const isGuest = user?.email?.includes('teclingo.local') || false;
   const recRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const [loadingAlternate, setLoadingAlternate] = useState<string | null>(null);
@@ -431,41 +440,85 @@ function App() {
     saveExerciseState(user.email, currentSubtopicId, { selectedAnswers, batchFeedbacks, attempts, completedSkills });
   }, [selectedAnswers, batchFeedbacks, attempts, completedSkills, user, currentSubtopicId]);
 
+  useEffect(() => {
+    if (!data || !showScrollHint) return;
+  }, [data, currentSubtopicId, showScrollHint]);
+
+  const dismissScrollHint = () => {
+    setShowScrollHint(false);
+    localStorage.setItem('teclingo_hide_scroll_hint', 'true');
+  };
+
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 max-w-md w-full text-center">
-          <h1 className="text-3xl font-bold text-blue-500 mb-2">TECLINGO AI</h1>
-          <p className="text-slate-400 mb-6">Nivel A1 - Curso de Inglés</p>
-          
-          <button 
-            onClick={handleLogin} 
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Fondo decorativo */}
+        <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="relative z-10 bg-slate-800/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-slate-700/50 max-w-lg w-full text-center space-y-8">
+          {/* Logo y título */}
+          <div className="space-y-3">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg shadow-blue-500/30 mb-2">
+              <span className="text-4xl">🧠</span>
+            </div>
+            <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+              TECLINGO AI
+            </h1>
+            <p className="text-slate-400 text-sm">Plataforma de inmersión lingüística con IA</p>
+          </div>
+
+          {/* Botón principal de Google — GRANDE Y FLOTANTE */}
+          <button
+            onClick={handleLogin}
             disabled={loggingIn}
-            className="w-full py-3 bg-white text-slate-800 rounded-lg font-bold text-lg hover:bg-slate-100 disabled:opacity-50 flex items-center justify-center gap-3 mb-4 transition-all"
+            className="group relative w-full py-5 bg-white text-slate-800 rounded-2xl font-extrabold text-xl hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-4 transition-all duration-300 shadow-xl shadow-white/10 hover:shadow-2xl hover:shadow-white/20 hover:scale-[1.02] active:scale-[0.98]"
           >
-            {loggingIn ? <><span className="animate-spin">⏳</span> Conectando...</> : <>🔑 Iniciar sesión con Google</>}
+            {/* Efecto brillo */}
+            <span className="absolute inset-0 rounded-2xl overflow-hidden">
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></span>
+            </span>
+            {loggingIn ? (
+              <><span className="animate-spin text-2xl">⏳</span> Conectando...</>
+            ) : (
+              <>
+                <svg className="w-7 h-7" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                <span>Iniciar con Google</span>
+                <span className="text-2xl">→</span>
+              </>
+            )}
           </button>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-600"></span></div>
+          {/* Separador */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-slate-600/50"></span>
+            </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-slate-800 px-3 text-slate-400 font-semibold">O para desarrollo local</span>
+              <span className="bg-slate-800/80 px-4 text-slate-500 font-semibold tracking-wider">o para desarrollo</span>
             </div>
           </div>
 
-          <button 
+          {/* Botón secundario — Modo prueba */}
+          <button
             onClick={() => {
               const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
               setUser(mockUser);
               localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
             }}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 flex items-center justify-center gap-3 transition-all shadow-lg shadow-blue-900/50"
+            className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-lg hover:from-blue-500 hover:to-indigo-500 flex items-center justify-center gap-3 transition-all duration-300 shadow-lg shadow-blue-900/40 hover:shadow-blue-800/60 hover:scale-[1.01] active:scale-[0.99]"
           >
-            🚀 Entrar en Modo de Prueba (Sin Google)
+            🚀 Entrar en Modo de Prueba
           </button>
 
-          <p className="text-slate-500 text-xs mt-6 leading-relaxed">
-            ⚠️ El botón de Google fallará con el error <code className="bg-slate-700 px-1 rounded">_.Cd</code> si no tienes un archivo <code className="bg-slate-700 px-1 rounded">.env</code> con tu <code className="bg-slate-700 px-1 rounded">VITE_GOOGLE_CLIENT_ID</code>.
+          {/* Nota inferior */}
+          <p className="text-slate-500 text-xs leading-relaxed">
+            El botón de Google requiere un archivo <code className="bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-300">.env</code> con <code className="bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-300">VITE_GOOGLE_CLIENT_ID</code>.
           </p>
         </div>
       </div>
@@ -600,7 +653,7 @@ function App() {
   if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-xl">Cargando TECLINGO AI...</div>;
   
   if (showOnboardingManual && user) {
-    return <OnboardingFlow userEmail={user.email} onComplete={() => setShowOnboardingManual(false)} />;
+    return <OnboardingFlow userEmail={user.email} onComplete={() => { setShowOnboardingManual(false); setActiveTab('settings'); }} />;
   }
 
   return (
@@ -672,14 +725,42 @@ function App() {
                   <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-700 p-6 rounded-2xl shadow-lg">
                     <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">🗺️ Tu Camino hacia la Certificación A1</h3>
                     <div className="flex items-center justify-between mb-4">
-                      <div className="flex-1">
+                      <div className="flex-1 group/bar">
                         <div className="flex justify-between text-sm text-slate-300 mb-1">
                           <span>Progreso Total</span>
                           <span className="font-bold text-blue-400">{realProgress.overall_completion}%</span>
                         </div>
-                        <div className="w-full bg-slate-700 rounded-full h-4 relative overflow-hidden">
-                          <div className="bg-gradient-to-r from-blue-600 to-indigo-500 h-4 rounded-full transition-all" style={{ width: `${realProgress.overall_completion}%` }}></div>
-                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">{realProgress.overall_completion}%</div>
+                        <div className="w-full bg-slate-700 rounded-full h-4 relative overflow-visible">
+                          <div className="bg-gradient-to-r from-blue-600 to-indigo-500 h-4 rounded-full transition-all relative z-0" style={{ width: `${realProgress.overall_completion}%` }}></div>
+                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white z-10">{realProgress.overall_completion}%</div>
+                          <div className="absolute top-full left-0 right-0 mt-2 opacity-0 group-hover/bar:opacity-100 transition-opacity duration-300 pointer-events-none group-hover/bar:pointer-events-auto z-20">
+                            <div className="flex gap-1 items-end">
+                              {subtopicsList.map((st, idx) => {
+                                const totalLessons = subtopicsList.length;
+                                const widthPct = totalLessons > 0 ? (100 / totalLessons) : 10;
+                                const skills = ['grammar','vocabulary','reading','listening','writing','pronunciation'];
+                                const hasProgress = skills.some(s => {
+                                  const sStats = realProgress.skill_stats?.[s];
+                                  return sStats && sStats.lessons_completed > 0 && st.sequence_order <= sStats.lessons_completed;
+                                });
+                                const isCompleted = st.sequence_order === 10 || (realProgress.a1_skills_passed && Object.values(realProgress.a1_skills_passed).some(Boolean) && st.sequence_order <= 3);
+                                let barColor = 'bg-slate-600';
+                                if (isCompleted) barColor = 'bg-green-500';
+                                else if (hasProgress) barColor = 'bg-amber-400';
+                                return (
+                                  <div key={st.subtopic_id} className="flex flex-col items-center" style={{ width: `${widthPct}%` }}>
+                                    <div className={`w-full h-1.5 rounded-full ${barColor} transition-all`} style={{ minHeight: '4px' }}></div>
+                                    <span className="text-[9px] text-slate-500 mt-0.5 leading-none">{idx + 1}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex gap-3 mt-1.5 justify-center">
+                              <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>Completada</span>
+                              <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>En progreso</span>
+                              <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>Sin iniciar</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1067,7 +1148,7 @@ function App() {
                     ? adaptText(st.title).substring(0, 28) + '...'
                     : adaptText(st.title);
                   return (
-                    <button key={st.subtopic_id} onClick={() => setCurrentSubtopicId(st.subtopic_id)}
+                    <button key={st.subtopic_id} onClick={() => { if (isGuest) { setPendingLessonId(st.subtopic_id); setShowGuestAlert(true); return; } setCurrentSubtopicId(st.subtopic_id); }}
                       className={`lesson-btn-3d ${btnClass}`}>
                       <span className="lesson-num">{st.sequence_order}</span>
                       <span className="lesson-title">{displayTitle}</span>
@@ -1116,14 +1197,24 @@ function App() {
                     <div className="flex flex-wrap gap-2 border-b border-slate-700 pb-3">
                       {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`px-3 py-2 rounded-lg text-sm font-medium ${skillTab === s.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{s.icon} {s.label}</button>))}
                     </div>
-                    <button 
-                      onClick={() => openHelp(skillTab)} 
-                      className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-blue-400 rounded-lg text-sm font-semibold transition-all border border-slate-600 hover:border-blue-500"
-                      title="Ver instrucciones de esta sección"
-                    >
-                      <span className="text-lg">❓</span>
-                      <span className="hidden sm:inline">¿Cómo funciona?</span>
-                    </button>
+                    <div className="relative">
+                      {showHelpHint && (
+                        <div className="absolute -top-10 right-0 flex flex-col items-end gap-1 z-30 animate-bounce">
+                          <span className="text-amber-400 font-bold text-xs whitespace-nowrap bg-slate-800/90 px-2 py-1 rounded-lg border border-amber-500/30">Lee cómo funciona cada ejercicio</span>
+                          <svg className="w-6 h-6 text-amber-400 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                          </svg>
+                        </div>
+                      )}
+                      <button 
+                        onClick={() => { openHelp(skillTab); if (showHelpHint) { setShowHelpHint(false); localStorage.setItem('teclingo_hide_help_hint', 'true'); } }}
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-blue-400 rounded-lg text-sm font-semibold transition-all border border-slate-600 hover:border-blue-500"
+                        title="Ver instrucciones de esta sección"
+                      >
+                        <span className="text-lg">❓</span>
+                        <span className="hidden sm:inline">¿Cómo funciona?</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* GRAMMAR */}
@@ -1701,6 +1792,24 @@ function App() {
         )}
       </div>
 
+      {/* FLECHA FLOTANTE - Scroll Hint */}
+      {showScrollHint && data && activeTab === 'lesson' && (
+        <div className="fixed top-0 left-0 right-0 z-40 flex flex-col items-center pt-3 pb-4 px-4 bg-gradient-to-b from-slate-900 via-slate-900/95 to-transparent pointer-events-none">
+          <div className="bg-slate-800/90 backdrop-blur-md border border-amber-500/40 rounded-2xl shadow-2xl shadow-amber-500/10 px-6 py-4 flex flex-col items-center gap-2 pointer-events-auto">
+            <p className="text-amber-400 font-extrabold text-sm md:text-base tracking-wide animate-pulse text-center">Desliza hacia abajo para ver el contenido</p>
+            <div className="animate-bounce cursor-pointer" onClick={() => document.querySelector('.panel-3d')?.scrollIntoView({ behavior: 'smooth' })}>
+              <svg className="w-16 h-16 md:w-20 md:h-20 text-amber-400 drop-shadow-[0_0_16px_rgba(251,191,36,0.6)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none group/check">
+              <input type="checkbox" onChange={dismissScrollHint} className="w-4 h-4 rounded border-slate-500 bg-slate-700 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer" />
+              <span className="text-slate-400 text-xs group-hover/check:text-slate-200 transition-colors">No volver a mostrar</span>
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE AYUDA GLOBAL (Corregido: ahora está dentro del return de App) */}
       <HelpModal 
         isOpen={showHelp} 
@@ -1708,6 +1817,38 @@ function App() {
         title={helpInstructions[currentHelpType]?.title || "Ayuda"}
         instructions={helpInstructions[currentHelpType]?.instructions || ["Instrucciones no disponibles."]}
       />
+
+      {/* MODAL DE ALERTA INVITADO */}
+      {showGuestAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-amber-500/50 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-in fade-in duration-200">
+            <div className="w-14 h-14 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center">
+              <span className="text-3xl">⚠️</span>
+            </div>
+            <h3 className="text-xl font-bold text-white">Modo Invitado</h3>
+            <p className="text-slate-300 text-sm leading-relaxed">
+              Estás usando la app como <span className="text-amber-400 font-semibold">invitado</span>. Tu progreso <span className="text-red-400 font-semibold">no se guardará</span> ni se sincronizará entre dispositivos.
+            </p>
+            <p className="text-slate-400 text-xs">
+              Regístrate con Google para que tu avance quede registrado permanentemente.
+            </p>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={() => { setShowGuestAlert(false); setPendingLessonId(null); handleLogin(); }}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold transition-all shadow-lg"
+              >
+                🔑 Registrarme con Google
+              </button>
+              <button
+                onClick={() => { setShowGuestAlert(false); if (pendingLessonId) setCurrentSubtopicId(pendingLessonId); setPendingLessonId(null); }}
+                className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-semibold text-sm transition-all"
+              >
+                Continuar sin guardar progreso
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

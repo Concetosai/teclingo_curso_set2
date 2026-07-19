@@ -265,6 +265,7 @@ class ADNData(BaseModel):
     temas: str
     formato: str
     estilo_sesion: str
+    que_evitar: str
     correccion: str
     horario: str
     minutos_dia: str
@@ -388,6 +389,39 @@ def get_subtopic_progress(user_id: str, subtopic_id: str):
         return result
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---- Grammar Library ----
+@router.get("/grammar-library")
+def get_grammar_library():
+    try:
+        with open(GRAMMAR_LIBRARY_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/grammar-library/{rule_id}")
+def get_grammar_rule(rule_id: str):
+    try:
+        with open(GRAMMAR_LIBRARY_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for rule in data.get("rules", []):
+            if rule["rule_id"] == rule_id:
+                return rule
+        raise HTTPException(status_code=404, detail=f"Regla '{rule_id}' no encontrada")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/grammar-library/by-subtopic/{subtopic_id}")
+def get_grammar_rules_by_subtopic(subtopic_id: str):
+    try:
+        with open(GRAMMAR_LIBRARY_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        rules = [r for r in data.get("rules", []) if subtopic_id in r.get("subtopic_ids", [])]
+        return {"subtopic_id": subtopic_id, "rules": rules}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

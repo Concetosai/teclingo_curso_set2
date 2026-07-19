@@ -28,23 +28,23 @@ export default function OnboardingFlow({ userEmail, onComplete }: Props) {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
-  const [isMuted, setIsMuted] = useState(true); // ✅ Nuevo: control de sonido
+  const [isMuted, setIsMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoStartedAt = useRef<number>(0);
 
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.src = STEPS[step].video;
       videoRef.current.load();
+      videoStartedAt.current = Date.now();
+      setVideoEnded(false);
+      videoRef.current.muted = isMuted;
       videoRef.current.play().catch(err => {
         console.warn("Autoplay bloqueado o error de video:", err);
       });
-      setVideoEnded(false);
-      // Mantener el estado de mute al cambiar de video
-      videoRef.current.muted = isMuted;
     }
   }, [step, isMuted]);
 
-  // ✅ Alternar silencio
   const toggleMute = () => {
     if (videoRef.current) {
       const newMuted = !videoRef.current.muted;
@@ -53,9 +53,17 @@ export default function OnboardingFlow({ userEmail, onComplete }: Props) {
     }
   };
 
+  const handleVideoEnded = () => {
+    const elapsed = Date.now() - videoStartedAt.current;
+    if (elapsed > 800) {
+      setVideoEnded(true);
+    }
+  };
+
   const handleOption = (opt: string) => {
     const id = STEPS[step].id;
     setAnswers(prev => ({ ...prev, [id]: opt }));
+    setVideoEnded(false);
 
     if (step === STEPS.length - 1) {
       finish();
@@ -103,11 +111,10 @@ export default function OnboardingFlow({ userEmail, onComplete }: Props) {
           autoPlay 
           muted={isMuted}
           playsInline 
-          onEnded={() => setVideoEnded(true)}
+          onEnded={handleVideoEnded}
           onPlay={() => setVideoEnded(false)}
         />
         
-        {/* ✅ Botón de sonido flotante */}
         <button
           onClick={toggleMute}
           className="absolute top-6 right-6 z-10 w-12 h-12 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full flex items-center justify-center text-white text-2xl border border-white/20 transition-all hover:scale-110"

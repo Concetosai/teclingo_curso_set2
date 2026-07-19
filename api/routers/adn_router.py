@@ -29,6 +29,7 @@ class ADNData(BaseModel):
     temas: str
     formato: str
     estilo_sesion: str
+    que_evitar: str
     correccion: str
     horario: str
     minutos_dia: str

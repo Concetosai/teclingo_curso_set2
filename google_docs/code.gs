@@ -21,7 +21,8 @@ const CONFIG = {
     TOEFL_LOGS: 'RegistrosTOEFL',
     PRONUNCIATION_LOGS: 'RegistrosPronunciacion',
     SETTINGS: 'ConfiguracionApp',
-    COURSE_PROGRESS: 'ProgresoCurso'
+    COURSE_PROGRESS: 'ProgresoCurso',
+    ONBOARDING_ADN: 'OnboardingADN'
   }
 };
 
@@ -361,6 +362,135 @@ function obtenerProgresoSubtopic(datos) {
     
   } catch (error) {
     console.error('Error en obtenerProgresoSubtopic:', error);
+    return { error: true, mensaje: error.toString() };
+  }
+}
+
+// ==========================================
+// 1B. FUNCIONES DE ONBOARDING / ADN DEL ALUMNO
+// ==========================================
+
+/**
+ * Guarda las respuestas del onboarding del usuario en la hoja 'OnboardingADN'
+ * @param {Object} datos - {email, confianza, nivel, motivo, meta_3m, urgencia, temas, formato, estilo_sesion, que_evitar, correccion, horario, minutos_dia}
+ * @returns {Object} { success, mensaje }
+ */
+function guardarADN(datos) {
+  try {
+    let sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID)
+                              .getSheetByName(CONFIG.SHEET_NAMES.ONBOARDING_ADN);
+
+    // Fallback: si la hoja no existe, crearla con encabezados
+    if (!sheet) {
+      const newSheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID)
+                                    .insertSheet(CONFIG.SHEET_NAMES.ONBOARDING_ADN);
+      newSheet.appendRow([
+        'timestamp', 'email', 'confianza', 'nivel', 'motivo', 'meta_3m',
+        'urgencia', 'temas', 'formato', 'estilo_sesion', 'que_evitar',
+        'correccion', 'horario', 'minutos_dia'
+      ]);
+      newSheet.getRange(1, 1, 1, 14).setFontWeight('bold').setBackground('#0058bc').setFontColor('#ffffff');
+      sheet = newSheet;
+    }
+
+    const now = new Date().toISOString();
+
+    // Verificar si ya existe registro para este email → actualizar
+    const data = sheet.getDataRange().getValues();
+    const emailCol = 1; // col B = email
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][emailCol]).toLowerCase() === String(datos.email).toLowerCase()) {
+        const row = i + 1;
+        sheet.getRange(row, 1).setValue(now);                    // timestamp
+        sheet.getRange(row, 3).setValue(datos.confianza || '');  // confianza
+        sheet.getRange(row, 4).setValue(datos.nivel || '');      // nivel
+        sheet.getRange(row, 5).setValue(datos.motivo || '');     // motivo
+        sheet.getRange(row, 6).setValue(datos.meta_3m || '');    // meta_3m
+        sheet.getRange(row, 7).setValue(datos.urgencia || '');   // urgencia
+        sheet.getRange(row, 8).setValue(datos.temas || '');      // temas
+        sheet.getRange(row, 9).setValue(datos.formato || '');    // formato
+        sheet.getRange(row, 10).setValue(datos.estilo_sesion || ''); // estilo_sesion
+        sheet.getRange(row, 11).setValue(datos.que_evitar || '');    // que_evitar
+        sheet.getRange(row, 12).setValue(datos.correccion || '');    // correccion
+        sheet.getRange(row, 13).setValue(datos.horario || '');       // horario
+        sheet.getRange(row, 14).setValue(datos.minutos_dia || '');   // minutos_dia
+
+        registrarActividad('ADN actualizado', datos.email);
+        return { success: true, mensaje: 'ADN actualizado para ' + datos.email };
+      }
+    }
+
+    // Si no existe, insertar nueva fila
+    sheet.appendRow([
+      now,                       // timestamp (A)
+      datos.email,               // email (B)
+      datos.confianza || '',     // confianza (C)
+      datos.nivel || '',         // nivel (D)
+      datos.motivo || '',        // motivo (E)
+      datos.meta_3m || '',       // meta_3m (F)
+      datos.urgencia || '',      // urgencia (G)
+      datos.temas || '',         // temas (H)
+      datos.formato || '',       // formato (I)
+      datos.estilo_sesion || '', // estilo_sesion (J)
+      datos.que_evitar || '',    // que_evitar (K)
+      datos.correccion || '',    // correccion (L)
+      datos.horario || '',       // horario (M)
+      datos.minutos_dia || ''    // minutos_dia (N)
+    ]);
+
+    registrarActividad('ADN guardado', datos.email);
+    return { success: true, mensaje: 'ADN guardado para ' + datos.email };
+
+  } catch (error) {
+    console.error('Error en guardarADN:', error);
+    return { error: true, mensaje: error.toString() };
+  }
+}
+
+/**
+ * Obtiene el ADN de un usuario desde la hoja 'OnboardingADN'
+ * @param {Object} datos - {email}
+ * @returns {Object} { email, confianza, nivel, ... } o { error }
+ */
+function obtenerADN(datos) {
+  try {
+    const sheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID)
+                              .getSheetByName(CONFIG.SHEET_NAMES.ONBOARDING_ADN);
+
+    if (!sheet) {
+      return { data: null };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const emailCol = 1;
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][emailCol]).toLowerCase() === String(datos.email).toLowerCase()) {
+        return {
+          data: {
+            email: data[i][1],
+            confianza: data[i][2],
+            nivel: data[i][3],
+            motivo: data[i][4],
+            meta_3m: data[i][5],
+            urgencia: data[i][6],
+            temas: data[i][7],
+            formato: data[i][8],
+            estilo_sesion: data[i][9],
+            que_evitar: data[i][10],
+            correccion: data[i][11],
+            horario: data[i][12],
+            minutos_dia: data[i][13]
+          }
+        };
+      }
+    }
+
+    return { data: null };
+
+  } catch (error) {
+    console.error('Error en obtenerADN:', error);
     return { error: true, mensaje: error.toString() };
   }
 }
@@ -772,6 +902,14 @@ function doPost(e) {
 
       case 'obtenerProgresoSubtopic':
         respuesta = obtenerProgresoSubtopic(params.datos);
+        break;
+
+      case 'guardarADN':
+        respuesta = guardarADN(params.datos);
+        break;
+
+      case 'obtenerADN':
+        respuesta = obtenerADN(params.datos);
         break;
         
       case 'enviarBienvenida':
