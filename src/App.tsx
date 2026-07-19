@@ -16,6 +16,7 @@ import AIConversationExercise from './components/AIConversationExercise'
 import OnboardingFlow from './components/Onboarding/OnboardingFlow';
 import { loginConGoogle, logout, obtenerUsuarioActual } from './services/authService'
 import { saveProgress, saveActivity, logEntrada, logSalida } from './services/sheetsService'
+import { speak as ttsSpeak, stop as ttsStop, pause as ttsPause, resume as ttsResume, isPlaying as ttsIsPlaying, isPaused as ttsIsPaused } from './services/ttsService'
 
 interface SubtopicData {
   title: string;
@@ -585,19 +586,19 @@ function App() {
   };
 
   const speak = (text: string) => {
-    if ('speechSynthesis' in window) {
-      if (recordingKey) { stopRecording(); return; }
-      if (audioState.isPlaying && audioState.text === text) { window.speechSynthesis.pause(); setAudioState({ isPlaying: false, text: '' }); return; }
-      if (!audioState.isPlaying && audioState.text === text && window.speechSynthesis.paused) { window.speechSynthesis.resume(); setAudioState({ isPlaying: true, text }); return; }
-      window.speechSynthesis.cancel();
-      let cleanText = text; const match = text.match(/['"]([^'"]+)['"]/); if (match) cleanText = match[1];
-      const u = new SpeechSynthesisUtterance(cleanText); u.lang = 'en-US'; u.rate = 0.9;
-      u.onend = () => setAudioState({ isPlaying: false, text: '' }); u.onerror = () => setAudioState({ isPlaying: false, text: '' });
-      window.speechSynthesis.speak(u); setAudioState({ isPlaying: true, text });
-    }
+    if (recordingKey) { stopRecording(); return; }
+    if (audioState.isPlaying && audioState.text === text) { ttsPause(); setAudioState({ isPlaying: false, text: '' }); return; }
+    if (!audioState.isPlaying && audioState.text === text && ttsIsPaused()) { ttsResume(); setAudioState({ isPlaying: true, text }); return; }
+    ttsStop();
+    setAudioState({ isPlaying: true, text });
+    ttsSpeak(text, {
+      rate: 0.92,
+      onEnd: () => setAudioState({ isPlaying: false, text: '' }),
+      onError: () => setAudioState({ isPlaying: false, text: '' }),
+    });
   };
 
-  const stopAudio = () => { if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); setAudioState({ isPlaying: false, text: '' }); } };
+  const stopAudio = () => { ttsStop(); setAudioState({ isPlaying: false, text: '' }); };
 
   const stopRecording = () => {
     if (recRef.current) { try { recRef.current.stop(); } catch(e) {} recRef.current = null; }

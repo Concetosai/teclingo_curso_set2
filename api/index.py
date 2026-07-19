@@ -466,3 +466,31 @@ def health_check():
 @app.get("/api")
 def api_root():
     return {"message": "TECLINGO AI Backend is running!"}
+
+# ================== TTS - Google Translate (voz natural) ==================
+class TTSRequest(BaseModel):
+    text: str
+
+@app.post("/api/tts")
+async def text_to_speech(req: TTSRequest):
+    try:
+        clean_text = req.text.strip()
+        if not clean_text:
+            raise HTTPException(status_code=400, detail="Text is required")
+        clean_text = clean_text[:200]
+        encoded = urllib.parse.quote(clean_text)
+        url = (
+            f"https://translate.google.com/translate_tts"
+            f"?ie=UTF-8&q={encoded}&tl=en&total=1&idx=0"
+            f"&textlen={len(clean_text)}&client=tw-ob&prev=input&ttsspeed=1"
+        )
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        request = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(request, timeout=10) as resp:
+            audio_data = resp.read()
+        from fastapi.responses import Response
+        return Response(content=audio_data, media_type="audio/mpeg")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"TTS failed: {str(e)}")

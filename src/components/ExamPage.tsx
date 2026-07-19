@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { speak as ttsSpeak } from '../services/ttsService';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -122,7 +123,7 @@ const A1_THRESHOLDS: Record<string, number> = { grammar: 70, vocabulary: 70, rea
 function shuffle<T>(arr: T[]): T[] { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function pickRandom<T>(arr: T[], n: number): T[] { return shuffle(arr).slice(0, n); }
 function normalizeAnswer(s: string): string { return s.toLowerCase().replace(/[.,!?;:'"]/g, '').trim(); }
-function speak(text: string) { if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.85; window.speechSynthesis.speak(u); } }
+function speak(text: string) { ttsSpeak(text, { rate: 0.92 }); }
 function getScoreColor(score: number): string { return score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400'; }
 
 // ==========================================
