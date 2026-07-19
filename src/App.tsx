@@ -123,6 +123,7 @@ function App() {
   const [showHelpHint, setShowHelpHint] = useState(() => {
     return localStorage.getItem('teclingo_hide_help_hint') !== 'true';
   });
+  const [showCertAlert, setShowCertAlert] = useState(false);
   const isGuest = user?.email?.includes('teclingo.local') || false;
   const recRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
@@ -1159,6 +1160,67 @@ function App() {
               </div>
             </div>
 
+            {/* BOTÓN EXAMEN DE CERTIFICACIÓN A1 */}
+            {data && realProgress && (() => {
+              const allLessonsDone = subtopicsList.every(st => {
+                if (st.sequence_order === 10) return true;
+                return st.sequence_order < 10 && (realProgress.skill_stats && Object.keys(realProgress.skill_stats).length > 0);
+              });
+              const completion100 = (realProgress.overall_completion || 0) >= 100;
+              const avg70 = (realProgress.overall_average || 0) >= 70;
+              const isUnlocked = completion100 && avg70;
+              return (
+                <div className={`relative p-5 rounded-2xl border-2 transition-all duration-300 ${isUnlocked
+                  ? 'bg-gradient-to-br from-amber-900/30 via-yellow-900/20 to-orange-900/30 border-amber-500/60 shadow-lg shadow-amber-500/10 cursor-pointer hover:shadow-amber-500/25 hover:border-amber-400'
+                  : 'bg-slate-800/60 border-slate-600/50 cursor-pointer hover:border-slate-500'
+                }`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-16 h-16 rounded-xl flex items-center justify-center text-3xl flex-shrink-0 ${isUnlocked
+                      ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg'
+                      : 'bg-slate-700/80'
+                    }`}>
+                      {isUnlocked ? '🎓' : '🔒'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className={`font-bold text-lg ${isUnlocked ? 'text-amber-300' : 'text-slate-400'}`}>
+                        Examen de Certificación A1
+                      </h4>
+                      <p className={`text-sm mt-0.5 ${isUnlocked ? 'text-amber-400/70' : 'text-slate-500'}`}>
+                        Evalúa todas tus habilidades en un solo examen.
+                      </p>
+                      {!isUnlocked && (
+                        <div className="flex flex-col gap-1 mt-2">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className={completion100 ? 'text-green-400' : 'text-slate-500'}>
+                              {completion100 ? '✅' : '❌'} Progreso: {realProgress.overall_completion || 0}% / 100%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className={avg70 ? 'text-green-400' : 'text-slate-500'}>
+                              {avg70 ? '✅' : '❌'} Promedio mínimo: {realProgress.overall_average || 0} / 70
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {isUnlocked && (
+                        <span className="inline-block mt-2 text-xs font-bold text-amber-300 bg-amber-500/20 px-3 py-1 rounded-full border border-amber-500/30">
+                          ¡Listo para examinarte!
+                        </span>
+                      )}
+                    </div>
+                    <div className={`text-2xl ${isUnlocked ? 'text-amber-400' : 'text-slate-600'}`}>
+                      ›
+                    </div>
+                  </div>
+                  <div onClick={() => {
+                    if (isGuest) { setShowGuestAlert(true); return; }
+                    if (isUnlocked) return;
+                    setShowCertAlert(true);
+                  }} className="absolute inset-0 rounded-2xl" />
+                </div>
+              );
+            })()}
+
             {data ? (
               <>
                 <section className="panel-3d p-6">
@@ -1846,6 +1908,40 @@ function App() {
                 Continuar sin guardar progreso
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CERTIFICACIÓN A1 - Condición de desbloqueo */}
+      {showCertAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-amber-500/50 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-in fade-in duration-200">
+            <div className="w-14 h-14 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center">
+              <span className="text-3xl">🔒</span>
+            </div>
+            <h3 className="text-xl font-bold text-amber-400">Examen de Certificación A1</h3>
+            <p className="text-slate-300 text-sm leading-relaxed">
+              Para desbloquear este examen debes cumplir ambas condiciones:
+            </p>
+            <div className="bg-slate-700/50 rounded-xl p-4 text-left space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-lg">📚</span>
+                <span className="text-slate-300">Completar el <span className="text-white font-bold">100%</span> del contenido</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-lg">🎯</span>
+                <span className="text-slate-300">Mantener un promedio mínimo de <span className="text-white font-bold">70/100</span></span>
+              </div>
+            </div>
+            <p className="text-slate-400 text-xs leading-relaxed">
+              Sigue practicando cada lección para alcanzar el 100% de avance con un promedio de al menos 70.
+            </p>
+            <button
+              onClick={() => setShowCertAlert(false)}
+              className="w-full py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl font-bold transition-all shadow-lg"
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
