@@ -1112,10 +1112,6 @@ function App() {
                 ) : (
                 <section className="panel-3d panel-header-purple p-6">
                   <h3 className="text-xl font-bold text-purple-400 mb-4">Práctica por Habilidad</h3>
-<<<<<<< HEAD
-                  <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-700/50 pb-3">
-                    {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`skill-tab-3d ${skillTab === s.key ? 'skill-tab-active' : 'skill-tab-inactive'}`}>{s.icon} {s.label}</button>))}
-=======
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex flex-wrap gap-2 border-b border-slate-700 pb-3">
                       {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`px-3 py-2 rounded-lg text-sm font-medium ${skillTab === s.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{s.icon} {s.label}</button>))}
@@ -1128,7 +1124,6 @@ function App() {
                       <span className="text-lg">❓</span>
                       <span className="hidden sm:inline">¿Cómo funciona?</span>
                     </button>
->>>>>>> 6640a4b (feat: add onboarding flow, ADN router, and compressed video assets)
                   </div>
 
                   {/* GRAMMAR */}
