@@ -2,6 +2,10 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 
 let currentAudio: HTMLAudioElement | null = null;
 
+function isDialogue(text: string): boolean {
+  return /\b[A-H]\s*:\s*/i.test(text);
+}
+
 function cleanTextForSpeech(raw: string): string {
   let t = raw;
   t = t.replace(/['"]([^'"]+)['"]/g, '$1');
@@ -45,7 +49,6 @@ function cleanTextForSpeech(raw: string): string {
   t = t.replace(/\([^)]{0,80}\)/g, ' ');
   t = t.replace(/\[[^\]]{0,80}\]/g, ' ');
   t = t.replace(/\{[^}]{0,80}\}/g, ' ');
-  t = t.replace(/[A-H]\s*:\s*/g, '. ');
   t = t.replace(/\s{2,}/g, ' ');
   t = t.replace(/\.\s*\./g, '.');
   t = t.replace(/,\s*,/g, ',');
@@ -53,6 +56,30 @@ function cleanTextForSpeech(raw: string): string {
   t = t.replace(/\s*[.,;:!]\s*$/g, '.');
   t = t.trim();
   return t;
+}
+
+function playAudioBlob(blob: Blob, opts?: { rate?: number; onStart?: () => void; onEnd?: () => void; onError?: () => void }): void {
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.playbackRate = opts?.rate ?? 0.92;
+  currentAudio = audio;
+
+  audio.onplay = () => opts?.onStart?.();
+  audio.onended = () => {
+    URL.revokeObjectURL(url);
+    currentAudio = null;
+    opts?.onEnd?.();
+  };
+  audio.onerror = () => {
+    URL.revokeObjectURL(url);
+    currentAudio = null;
+    opts?.onError?.();
+  };
+  audio.play().catch(() => {
+    URL.revokeObjectURL(url);
+    currentAudio = null;
+    opts?.onError?.();
+  });
 }
 
 export function speak(
@@ -65,6 +92,12 @@ export function speak(
   }
 ): void {
   stop();
+
+  if (isDialogue(text)) {
+    speakDialogue(text, opts);
+    return;
+  }
+
   const clean = cleanTextForSpeech(text);
   if (!clean) return;
 
@@ -78,29 +111,31 @@ export function speak(
       return res.blob();
     })
     .then((blob) => {
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.playbackRate = opts?.rate ?? 0.92;
-      currentAudio = audio;
-
-      audio.onplay = () => opts?.onStart?.();
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        currentAudio = null;
-        opts?.onEnd?.();
-      };
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        currentAudio = null;
-        opts?.onError?.();
-      };
-      audio.play().catch(() => {
-        URL.revokeObjectURL(url);
-        currentAudio = null;
-        opts?.onError?.();
-      });
+      playAudioBlob(blob, opts);
     })
     .catch(() => {
+      fallbackSpeak(clean, opts);
+    });
+}
+
+function speakDialogue(
+  text: string,
+  opts?: { rate?: number; onStart?: () => void; onEnd?: () => void; onError?: () => void }
+): void {
+  fetch(`${API_BASE}/api/tts-dialogue`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, rate: '+0%' }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error('TTS dialogue API error');
+      return res.blob();
+    })
+    .then((blob) => {
+      playAudioBlob(blob, opts);
+    })
+    .catch(() => {
+      const clean = cleanTextForSpeech(text);
       fallbackSpeak(clean, opts);
     });
 }

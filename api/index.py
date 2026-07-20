@@ -4,6 +4,8 @@ import re
 import datetime
 import urllib.request
 import urllib.parse
+import asyncio
+import io
 from fastapi import FastAPI, APIRouter, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
@@ -494,3 +496,99 @@ async def text_to_speech(req: TTSRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"TTS failed: {str(e)}")
+
+# ================== TTS DIALOGUE - Edge TTS (voces masculina/femenina) ==================
+VOICES = {
+    "male": "en-US-GuyNeural",
+    "female": "en-US-AriaNeural",
+}
+
+class TTSDialogueRequest(BaseModel):
+    text: str
+    male_voice: Optional[str] = None
+    female_voice: Optional[str] = None
+    rate: Optional[str] = "+0%"
+
+def parse_dialogue(text: str):
+    import re as _re
+    cleaned = _re.sub(r'[""\u201c\u201d]', '', text)
+    cleaned = _re.sub(r'Escucha[^.]*\.', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'Listen[^.]*\.', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'Read[^.]*\.', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'What[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'How[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'Where[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'When[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'Why[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'Who[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'\([^)]{0,80}\)', '', cleaned)
+    cleaned = _re.sub(r'\[[^\]]{0,80}\]', '', cleaned)
+    cleaned = _re.sub(r'\s{2,}', ' ', cleaned).strip()
+
+    pattern = _re.compile(r'\b([A-Ha-h])\s*:\s*')
+    parts = pattern.split(cleaned)
+
+    if len(parts) < 3:
+        return [{"speaker": "female", "text": cleaned}]
+
+    turns = []
+    speaker_map = {}
+    speaker_counter = 0
+    current_speaker = None
+
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        if len(part) == 1 and part.upper() in 'ABCDEFGH':
+            if part.upper() not in speaker_map:
+                speaker_map[part.upper()] = "female" if speaker_counter % 2 == 0 else "male"
+                speaker_counter += 1
+            current_speaker = speaker_map[part.upper()]
+        else:
+            if current_speaker and part:
+                turns.append({"speaker": current_speaker, "text": part})
+            elif part:
+                turns.append({"speaker": "female", "text": part})
+
+    return turns if turns else [{"speaker": "female", "text": cleaned}]
+
+
+async def generate_edge_tts(text: str, voice: str, rate: str = "+0%") -> bytes:
+    import edge_tts
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    audio_buffer = io.BytesIO()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_buffer.write(chunk["data"])
+    return audio_buffer.getvalue()
+
+
+@app.post("/api/tts-dialogue")
+async def tts_dialogue(req: TTSDialogueRequest):
+    try:
+        male_voice = req.male_voice or VOICES["male"]
+        female_voice = req.female_voice or VOICES["female"]
+        rate = req.rate or "+0%"
+
+        turns = parse_dialogue(req.text)
+        if not turns:
+            raise HTTPException(status_code=400, detail="No text to speak")
+
+        audio_chunks = []
+        for turn in turns:
+            voice = male_voice if turn["speaker"] == "male" else female_voice
+            audio_data = await generate_edge_tts(turn["text"], voice, rate)
+            if audio_data:
+                audio_chunks.append(audio_data)
+
+        if not audio_chunks:
+            raise HTTPException(status_code=502, detail="No audio generated")
+
+        combined = b"".join(audio_chunks)
+        from fastapi.responses import Response
+        return Response(content=combined, media_type="audio/mpeg")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"TTS dialogue failed: {str(e)}")
