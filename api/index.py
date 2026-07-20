@@ -511,16 +511,10 @@ class TTSDialogueRequest(BaseModel):
 
 def parse_dialogue(text: str):
     import re as _re
-    cleaned = _re.sub(r'[""\u201c\u201d]', '', text)
-    cleaned = _re.sub(r'Escucha[^.]*\.', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'Listen[^.]*\.', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'Read[^.]*\.', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'What[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'How[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'Where[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'When[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'Why[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
-    cleaned = _re.sub(r'Who[^?]*\?', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'["\u201c\u201d]', '', text)
+    cleaned = _re.sub(r'Escucha el audio[^:]*:\s*', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'Listen and[^:]*:\s*', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'Read and[^:]*:\s*', '', cleaned, flags=_re.IGNORECASE)
     cleaned = _re.sub(r'\([^)]{0,80}\)', '', cleaned)
     cleaned = _re.sub(r'\[[^\]]{0,80}\]', '', cleaned)
     cleaned = _re.sub(r'\s{2,}', ' ', cleaned).strip()
