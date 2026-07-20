@@ -503,11 +503,82 @@ VOICES = {
     "female": "en-US-AriaNeural",
 }
 
-class TTSDialogueRequest(BaseModel):
-    text: str
-    male_voice: Optional[str] = None
-    female_voice: Optional[str] = None
-    rate: Optional[str] = "+0%"
+FEMALE_NAMES = {
+    'maria', 'sofia', 'sofía', 'ana', 'anna', 'emma', 'sarah', 'sara', 'laura',
+    'elena', 'lucia', 'lucía', 'carmen', 'rosa', 'patricia', 'claudia', 'andrea',
+    'monica', 'monica', 'diana', 'valeria', 'camila', 'fernanda', 'gabriela',
+    'adriana', 'beatriz', 'carolina', 'cristina', 'daniela', 'dolores', 'eva',
+    'francisca', 'gloria', 'isabel', 'jennifer', 'jessica', 'julia', 'juliette',
+    'karen', 'katherine', 'kelly', 'linda', 'lizbeth', 'lorena', 'maggie',
+    'martha', 'melissa', 'nancy', 'nora', 'olivia', 'pamela', 'paola', 'paula',
+    'pilar', 'raquel', 'regina', 'reina', 'rosario', 'silvia', 'simone', 'sonia',
+    'susana', 'tania', 'teresa', 'vanessa', 'veronica', 'victoria', 'virginia',
+    'ximena', 'yolanda', 'zoe', 'amanda', 'angela', 'betty', 'carla', 'denise',
+    'diana', 'grace', 'hannah', 'helen', 'jane', 'janet', 'jean', 'joyce',
+    'kate', 'kim', 'lily', 'lisa', 'lucy', 'marie', 'mary', 'nancy', 'rachel',
+    'rose', 'ruth', 'sandra', 'sophia', 'susan', 'tina', 'violet', 'wendy',
+}
+
+MALE_NAMES = {
+    'carlos', 'pedro', 'juan', 'jose', 'josé', 'luis', 'miguel', 'antonio',
+    'francisco', 'manuel', 'diego', 'alejandro', 'alejandro', 'rafael', 'rafael',
+    'daniel', 'david', 'pablo', 'pablo', 'javier', 'sergio', 'sergio', 'andres',
+    'andrés', 'fernando', 'eduardo', 'roberto', 'ricardo', 'alberto', 'alberto',
+    'marcos', 'martin', 'martín', 'oscar', 'óscar', 'tomás', 'tomas', 'angel',
+    'ángel', 'adrian', 'adrián', 'emilio', 'enrique', 'esteban', 'felipe',
+    'gabriel', 'hector', 'héctor', 'hugo', 'israel', 'iván', 'ivan', 'jorge',
+    'leonardo', 'marcelo', 'mario', 'mateo', 'maximo', 'nicolas', 'nicolás',
+    'omar', 'pablo', 'raul', 'raúl', 'reynaldo', 'rodrigo', 'ruben', 'rubén',
+    'salvador', 'sebastian', 'sebastián', 'simon', 'simón', 'tomas', 'valentín',
+    'valentin', 'victor', 'víctor', 'vinicio', 'william', 'james', 'john',
+    'robert', 'michael', 'david', 'richard', 'joseph', 'thomas', 'charles',
+    'christopher', 'matthew', 'anthony', 'mark', 'donald', 'paul', 'steven',
+    'andrew', 'joshua', 'kenneth', 'kevin', 'brian', 'george', 'timothy',
+    'ronald', 'edward', 'jason', 'jeffrey', 'ryan', 'jacob', 'gary',
+    'nicholas', 'eric', 'stephen', 'jonathan', 'larry', 'justin', 'scott',
+    'brandon', 'benjamin', 'samuel', 'raymond', 'gregory', 'frank', 'alexander',
+    'patrick', 'jack', 'dennis', 'jerry', 'tyler', 'aaron', 'jose', 'adam',
+    'nathan', 'henry', 'peter', 'zachary', 'douglas', 'harold', 'carl',
+    'arthur', 'gerald', 'roger', 'keith', 'jeremy', 'terry', 'lawrence',
+    'sean', 'christian', 'wayne', 'albert', 'fred', 'anthony', 'bobby',
+    'bruce', 'philip', 'harry', 'billy', 'danny', 'howard', 'ralph',
+}
+
+FEMALE_PRONOUNS = {'she', 'her', 'hers', 'herself', 'woman', 'girl', 'mother', 'mom', 'sister', 'daughter', 'aunt', 'grandmother'}
+MALE_PRONOUNS = {'he', 'him', 'his', 'himself', 'man', 'boy', 'father', 'dad', 'brother', 'son', 'uncle', 'grandfather'}
+
+
+def detect_gender(text: str) -> str:
+    import re as _re
+    words = set(_re.findall(r'\b[a-z]+\b', text.lower()))
+
+    female_name_hits = words & FEMALE_NAMES
+    male_name_hits = words & MALE_NAMES
+
+    if female_name_hits and not male_name_hits:
+        return "female"
+    if male_name_hits and not female_name_hits:
+        return "male"
+
+    female_pronoun_hits = words & FEMALE_PRONOUNS
+    male_pronoun_hits = words & MALE_PRONOUNS
+
+    if female_pronoun_hits and not male_pronoun_hits:
+        return "female"
+    if male_pronoun_hits and not female_pronoun_hits:
+        return "male"
+
+    if female_name_hits and male_name_hits:
+        if len(female_name_hits) >= len(male_name_hits):
+            return "female"
+        return "male"
+    if female_pronoun_hits and male_pronoun_hits:
+        if len(female_pronoun_hits) >= len(male_pronoun_hits):
+            return "female"
+        return "male"
+
+    return "unknown"
+
 
 def parse_dialogue(text: str):
     import re as _re
@@ -525,27 +596,61 @@ def parse_dialogue(text: str):
     if len(parts) < 3:
         return [{"speaker": "female", "text": cleaned}]
 
-    turns = []
-    speaker_map = {}
-    speaker_counter = 0
-    current_speaker = None
+    raw_turns = []
+    current_letter = None
 
     for part in parts:
         part = part.strip()
         if not part:
             continue
         if len(part) == 1 and part.upper() in 'ABCDEFGH':
-            if part.upper() not in speaker_map:
-                speaker_map[part.upper()] = "female" if speaker_counter % 2 == 0 else "male"
-                speaker_counter += 1
-            current_speaker = speaker_map[part.upper()]
+            current_letter = part.upper()
+        elif current_letter and part:
+            raw_turns.append({"letter": current_letter, "text": part})
+        elif part:
+            raw_turns.append({"letter": "?", "text": part})
+
+    if not raw_turns:
+        return [{"speaker": "female", "text": cleaned}]
+
+    speaker_texts = {}
+    for turn in raw_turns:
+        letter = turn["letter"]
+        if letter not in speaker_texts:
+            speaker_texts[letter] = ""
+        speaker_texts[letter] += " " + turn["text"]
+
+    speaker_genders = {}
+    for letter, full_text in speaker_texts.items():
+        gender = detect_gender(full_text)
+        speaker_genders[letter] = gender
+
+    unknown_speakers = [l for l, g in speaker_genders.items() if g == "unknown"]
+    if len(unknown_speakers) > 1:
+        for i, letter in enumerate(unknown_speakers):
+            speaker_genders[letter] = "female" if i % 2 == 0 else "male"
+    elif len(unknown_speakers) == 1:
+        known_genders = set(g for l, g in speaker_genders.items() if g != "unknown")
+        if "male" in known_genders:
+            speaker_genders[unknown_speakers[0]] = "female"
+        elif "female" in known_genders:
+            speaker_genders[unknown_speakers[0]] = "male"
         else:
-            if current_speaker and part:
-                turns.append({"speaker": current_speaker, "text": part})
-            elif part:
-                turns.append({"speaker": "female", "text": part})
+            speaker_genders[unknown_speakers[0]] = "female"
+
+    turns = []
+    for turn in raw_turns:
+        gender = speaker_genders.get(turn["letter"], "female")
+        turns.append({"speaker": gender, "text": turn["text"]})
 
     return turns if turns else [{"speaker": "female", "text": cleaned}]
+
+
+class TTSDialogueRequest(BaseModel):
+    text: str
+    male_voice: Optional[str] = None
+    female_voice: Optional[str] = None
+    rate: Optional[str] = "+0%"
 
 
 async def generate_edge_tts(text: str, voice: str, rate: str = "+0%") -> bytes:
