@@ -16,6 +16,7 @@ import AIConversationExercise from './components/AIConversationExercise'
 import OnboardingFlow from './components/Onboarding/OnboardingFlow';
 import { loginConGoogle, logout, obtenerUsuarioActual } from './services/authService'
 import { saveProgress, saveActivity, logEntrada, logSalida } from './services/sheetsService'
+import { useLastSession } from './hooks/useLastSession'
 import { speak as ttsSpeak, stop as ttsStop, pause as ttsPause, resume as ttsResume, isPlaying as ttsIsPlaying, isPaused as ttsIsPaused } from './services/ttsService'
 
 interface SubtopicData {
@@ -127,6 +128,7 @@ function App() {
   const scrollHintRef = useRef<HTMLDivElement>(null);
   const generatedOptionsCacheRef = useRef<Record<string, string[]>>({});
   const [showCertAlert, setShowCertAlert] = useState(false);
+  const [showTrialMode, setShowTrialMode] = useState(false);
   const isGuest = user?.email?.includes('teclingo.local') || false;
   const recRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
@@ -150,6 +152,7 @@ function App() {
   };
 
   const userId = user?.email || 'anonymous';
+  const { lastSession, saveLastSession, hasRecentSession } = useLastSession(user?.email || null);
 
   // ==========================================
   // DICCIONARIO DE INSTRUCCIONES POR HABILIDAD/JUEGO
@@ -277,6 +280,21 @@ function App() {
     if (result.success) {
       setUser(result.usuario);
       logEntrada();
+      // Restaurar última sesión guardada
+      if (result.usuario?.email) {
+        try {
+          const raw = localStorage.getItem(`teclingo_last_session_${result.usuario.email}`);
+          if (raw) {
+            const session = JSON.parse(raw);
+            const isRecent = Date.now() - session.timestamp < 7 * 24 * 60 * 60 * 1000;
+            if (isRecent) {
+              if (session.tab) setActiveTab(session.tab);
+              if (session.subtopicId) setCurrentSubtopicId(session.subtopicId);
+              if (session.skillTab) setSkillTab(session.skillTab);
+            }
+          }
+        } catch {}
+      }
     }
     setLoggingIn(false);
   };
@@ -345,11 +363,17 @@ function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (user) logSalida('cierre_navegador');
+      if (user) {
+        logSalida('cierre_navegador');
+        // Guardar sesión actual de forma síncrona antes de cerrar
+        if (!isGuest) {
+          saveLastSession({ tab: activeTab, subtopicId: currentSubtopicId, skillTab });
+        }
+      }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [user]);
+  }, [user, isGuest, activeTab, currentSubtopicId, skillTab, saveLastSession]);
 
   const adaptText = (text: string | null | undefined): string => {
     if (!text) return '';
@@ -492,77 +516,287 @@ function App() {
     saveExerciseState(user.email, currentSubtopicId, { selectedAnswers, batchFeedbacks, attempts, completedSkills });
   }, [selectedAnswers, batchFeedbacks, attempts, completedSkills, user, currentSubtopicId]);
 
+  // Guardar última sesión (tab, subtopic, skill) para restaurar al volver
+  useEffect(() => {
+    if (!user || isGuest) return;
+    saveLastSession({ tab: activeTab, subtopicId: currentSubtopicId, skillTab });
+  }, [activeTab, currentSubtopicId, skillTab, user, isGuest, saveLastSession]);
+
+  // =============================================
+  // PANTALLA DE SELECCIÓN DE EXPERIENCIAS (PRUEBA SIN REGISTRO)
+  // =============================================
+  if (showTrialMode && !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Fondo decorativo */}
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-lime-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{backgroundImage: 'linear-gradient(rgba(132,204,22,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(132,204,22,0.3) 1px, transparent 1px)', backgroundSize: '60px 60px'}}></div>
+
+        <div className="relative z-10 w-full max-w-md animate-in fade-in duration-500">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/20 mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-lime-400 animate-pulse"></span>
+              <span className="text-[10px] font-mono tracking-widest text-lime-400 uppercase">Modo Prueba Activo</span>
+            </div>
+            <h1 className="text-3xl font-black text-white mb-2">
+              Elige tu <span className="text-lime-400">experiencia</span>
+            </h1>
+            <p className="text-slate-400 text-sm font-light">
+              Explora sin registro. Descubre cómo TECLINGO puede entrenar tu cerebro.
+            </p>
+          </div>
+
+          {/* Tarjetas de experiencia */}
+          <div className="space-y-4">
+            {/* Opción 1: Herramientas IA — abre teclingoingles.com en nueva pestaña */}
+            <button
+              onClick={() => window.open('https://www.teclingoingles.com', '_blank')}
+              className="group w-full text-left p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-lime-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-lime-500/5 hover:bg-slate-800/80"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                  🤖
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-bold text-base mb-1 group-hover:text-lime-400 transition-colors">
+                    Probar Herramientas IA
+                  </h3>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Ejercicios interactivos de grammar, vocabulary, speaking y más. Evaluación automática con inteligencia artificial.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[8px] font-mono text-slate-400 uppercase border border-slate-700/50">Grammar</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[8px] font-mono text-slate-400 uppercase border border-slate-700/50">Vocabulary</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[8px] font-mono text-slate-400 uppercase border border-slate-700/50">Speaking</span>
+                    <span className="px-2 py-0.5 rounded-full bg-lime-500/10 text-[8px] font-mono text-lime-400 uppercase border border-lime-500/20">IA</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end flex-shrink-0">
+                  <span className="text-slate-600 group-hover:text-lime-400 transition-colors text-xl">→</span>
+                  <span className="text-[8px] text-slate-600 font-mono mt-1">nueva pestaña</span>
+                </div>
+              </div>
+            </button>
+
+            {/* Opción 2: Curso Express */}
+            <button
+              onClick={() => {
+                const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
+                setUser(mockUser);
+                localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
+              }}
+              className="group w-full text-left p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-lime-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-lime-500/5 hover:bg-slate-800/80"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                  📚
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-bold text-base mb-1 group-hover:text-emerald-400 transition-colors">
+                    Curso Express (3 lecciones)
+                  </h3>
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    Subject Pronouns, Verb To Be y Negatives. Teoría + ejercicios + vocabulario con adaptación por intereses.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">A1 Level</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">3 lecciones</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">Progreso</span>
+                  </div>
+                </div>
+                <span className="text-slate-600 group-hover:text-emerald-400 transition-colors text-xl">→</span>
+              </div>
+            </button>
+
+            {/* Opción 3: ADN Digital — abre OnboardingFlow */}
+            <button
+              onClick={() => {
+                const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
+                setUser(mockUser);
+                localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
+                setShowOnboardingManual(true);
+              }}
+              className="group w-full text-left p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-violet-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-violet-500/5 hover:bg-slate-800/80"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                  🧬
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-bold text-base mb-1 group-hover:text-violet-400 transition-colors">
+                    Descubre tu ADN Digital
+                  </h3>
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    Onboarding interactivo: descubre tu perfil de aprendizaje, motivación, estilo y horario ideal. 14 pasos personalizados.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">ADN</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">14 pasos</span>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">Videos</span>
+                  </div>
+                </div>
+                <span className="text-slate-600 group-hover:text-violet-400 transition-colors text-xl">→</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Botón volver */}
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => setShowTrialMode(false)}
+              className="text-slate-500 hover:text-white text-xs font-medium transition-colors"
+            >
+              ← Volver a opciones de acceso
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
         {/* Fondo decorativo */}
-        <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-lime-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[300px] h-[300px] bg-lime-400/3 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="relative z-10 bg-slate-800/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-slate-700/50 max-w-lg w-full text-center space-y-8">
-          {/* Logo y título */}
-          <div className="space-y-3">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg shadow-blue-500/30 mb-2">
-              <span className="text-4xl">🧠</span>
+        {/* Grid de fondo sutil */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{backgroundImage: 'linear-gradient(rgba(132,204,22,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(132,204,22,0.3) 1px, transparent 1px)', backgroundSize: '60px 60px'}}></div>
+
+        <div className="relative z-10 w-full max-w-md">
+          {/* Card principal */}
+          <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-800/80 overflow-hidden">
+            
+            {/* Header con logo */}
+            <div className="relative px-8 pt-10 pb-6 text-center">
+              {/* Badge animado */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/20 mb-5">
+                <span className="w-1.5 h-1.5 rounded-full bg-lime-400 animate-pulse"></span>
+                <span className="text-[10px] font-mono tracking-widest text-lime-400 uppercase">Coach IA Activo</span>
+              </div>
+
+              {/* Logo */}
+              <div className="inline-flex items-center justify-center w-36 h-36 rounded-3xl shadow-xl shadow-lime-500/10 mb-5 overflow-hidden bg-slate-800/50 border border-slate-700/50">
+                <img src="/assets/images/mascotas/teclingo_main_logo.webp" alt="Logo TECLINGO" className="w-full h-full object-contain" />
+              </div>
+
+              {/* Título */}
+              <h1 className="text-3xl font-black tracking-tight text-white leading-tight mb-2">
+                Tu coach personal<br/>
+                <span className="text-lime-400">para hablar inglés.</span>
+              </h1>
+
+              {/* Subtítulo */}
+              <p className="text-slate-400 text-sm font-light leading-relaxed max-w-xs mx-auto">
+                Entrena tu cerebro con sesiones diarias de IA.
+                <br/>
+                <span className="text-lime-400/80 font-medium">7 días de prueba.</span> Sin compromiso. Sin tarjeta.
+              </p>
+
+              {/* Badges de confianza */}
+              <div className="flex flex-wrap justify-center gap-2 mt-5">
+                <span className="px-3 py-1 rounded-full border border-slate-700/60 text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                  🧠 Neuroplasticidad
+                </span>
+                <span className="px-3 py-1 rounded-full border border-slate-700/60 text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                  ⚡ 5 min/día
+                </span>
+                <span className="px-3 py-1 rounded-full border border-slate-700/60 text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                  📈 Progreso real
+                </span>
+              </div>
             </div>
-            <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
-              TECLINGO AI
-            </h1>
-            <p className="text-slate-400 text-sm">Plataforma de inmersión lingüística con IA</p>
-          </div>
 
-          {/* Botón principal de Google — GRANDE Y FLOTANTE */}
-          <button
-            onClick={handleLogin}
-            disabled={loggingIn}
-            className="group relative w-full py-5 bg-white text-slate-800 rounded-2xl font-extrabold text-xl hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-4 transition-all duration-300 shadow-xl shadow-white/10 hover:shadow-2xl hover:shadow-white/20 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            {/* Efecto brillo */}
-            <span className="absolute inset-0 rounded-2xl overflow-hidden">
-              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></span>
-            </span>
-            {loggingIn ? (
-              <><span className="animate-spin text-2xl">⏳</span> Conectando...</>
-            ) : (
-              <>
-                <svg className="w-7 h-7" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            {/* Botones de acción */}
+            <div className="px-8 pb-8 space-y-3">
+              {/* Botón principal — Prueba gratuita */}
+              <button
+                onClick={() => setShowTrialMode(true)}
+                className="group relative w-full py-4 bg-lime-400 hover:bg-lime-300 text-slate-950 rounded-xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg shadow-lime-500/20 hover:shadow-lime-400/30 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+              >
+                <span className="absolute inset-0 rounded-xl overflow-hidden">
+                  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></span>
+                </span>
+                <span className="text-lg">🚀</span>
+                Comienza tu prueba gratuita
+                <span className="text-sm opacity-70">→</span>
+              </button>
+
+              {/* Separador */}
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 h-px bg-slate-700/50"></div>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600">O accede con</span>
+                <div className="flex-1 h-px bg-slate-700/50"></div>
+              </div>
+
+              {/* Botón Google */}
+              <button
+                onClick={handleLogin}
+                disabled={loggingIn}
+                className="w-full py-3 bg-slate-800/60 border border-slate-700/60 text-white text-xs font-medium rounded-xl hover:bg-slate-700/60 hover:border-slate-600 transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                <span>Iniciar con Google</span>
-                <span className="text-2xl">→</span>
-              </>
-            )}
-          </button>
+                Continuar con Google
+              </button>
 
-          {/* Separador */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-600/50"></span>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-slate-800/80 px-4 text-slate-500 font-semibold tracking-wider">o para desarrollo</span>
+              {/* Botón secundario — Modo prueba */}
+              <button
+                onClick={() => {
+                  const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
+                  setUser(mockUser);
+                  localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
+                }}
+                className="w-full py-3 bg-slate-800/40 border border-slate-700/40 text-slate-300 text-xs font-medium rounded-xl hover:bg-slate-700/40 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                🧪 Entrar como usuario de prueba
+              </button>
+
+              {/* Social Proof */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/60">
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {[1,2,3].map((i) => (
+                      <div key={i} className="w-6 h-6 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[8px] text-white font-mono">
+                        {String.fromCharCode(64 + i)}
+                      </div>
+                    ))}
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-light">
+                    <span className="text-lime-400 font-medium">2,500+</span> estudiantes
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="flex text-lime-400 text-[11px]">
+                    {"★★★★★"}
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">4.9/5</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Botón secundario — Modo prueba */}
-          <button
-            onClick={() => {
-              const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
-              setUser(mockUser);
-              localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
-            }}
-            className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-lg hover:from-blue-500 hover:to-indigo-500 flex items-center justify-center gap-3 transition-all duration-300 shadow-lg shadow-blue-900/40 hover:shadow-blue-800/60 hover:scale-[1.01] active:scale-[0.99]"
-          >
-            🚀 Entrar en Modo de Prueba
-          </button>
-
-          {/* Nota inferior */}
-          <p className="text-slate-500 text-xs leading-relaxed">
-            El botón de Google requiere un archivo <code className="bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-300">.env</code> con <code className="bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-300">VITE_GOOGLE_CLIENT_ID</code>.
-          </p>
+          {/* Beneficios abajo */}
+          <div className="grid grid-cols-3 gap-3 mt-6 px-2">
+            {[
+              { icon: "🧠", title: "Entrenamiento\ncerebral", desc: "" },
+              { icon: "🎯", title: "Speaking\npráctico", desc: "" },
+              { icon: "📊", title: "Progreso\nmedible", desc: "" },
+            ].map((feature, i) => (
+              <div key={i} className="flex flex-col items-center text-center gap-1.5 p-3 rounded-xl bg-slate-900/40 border border-slate-800/40">
+                <span className="text-xl">{feature.icon}</span>
+                <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider whitespace-pre-line leading-tight">{feature.title}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -800,7 +1034,7 @@ function App() {
   if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-xl">Cargando TECLINGO AI...</div>;
   
   if (showOnboardingManual && user) {
-    return <OnboardingFlow userEmail={user.email} onComplete={() => { setShowOnboardingManual(false); setActiveTab('settings'); }} />;
+    return <OnboardingFlow userEmail={user.email} onComplete={() => { setShowOnboardingManual(false); setActiveTab('lesson'); setCurrentSubtopicId('A1-M01-ST01'); }} />;
   }
 
   return (
@@ -1323,22 +1557,35 @@ function App() {
           <div className="space-y-8">
             {/* BARRA COMPACTA DE LECCIÓN ACTUAL (cuando la grilla está colapsada) */}
             {!showLessonGrid && data && (
-              <div className="bg-slate-800/80 p-4 rounded-2xl border border-blue-500/30 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              <div className="bg-slate-800/80 p-4 rounded-2xl border border-blue-500/30 flex items-center justify-between gap-3 lesson-change-flash">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <span className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-lg shadow-blue-500/30">
                     #{subtopicsList.find(s => s.subtopic_id === currentSubtopicId)?.sequence_order || '?'}
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Lección actual</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-blue-400 uppercase tracking-wider font-semibold">Lección actual</p>
                     <p className="text-white font-bold text-sm truncate">{adaptText(data.title)}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowLessonGrid(true)}
-                  className="flex-shrink-0 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl text-sm font-semibold transition-all border border-slate-600 hover:border-blue-500"
-                >
-                  📋 Cambiar
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setShowLessonGrid(true)}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl text-sm font-semibold transition-all border border-slate-600 hover:border-blue-500"
+                  >
+                    📋 Cambiar
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* FLECHA INDICADORA DE CONTENIDO ABAJO */}
+            {!showLessonGrid && data && (
+              <div className="flex justify-center animate-bounce-slow">
+                <div className="flex flex-col items-center gap-1 text-cyan-400">
+                  <span className="text-xs font-semibold text-cyan-300 tracking-wide">Contenido abajo</span>
+                  <svg className="w-5 h-5 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
             )}
 
@@ -1366,6 +1613,31 @@ function App() {
                   <span className="bounce-arrow text-cyan-400 text-2xl drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">⬇</span>
                 </div>
               )}
+              {/* TARJETA: Continúa donde lo dejaste */}
+              {lastSession && hasRecentSession() && lastSession.subtopicId && lastSession.subtopicId !== currentSubtopicId && (
+                <button
+                  onClick={() => {
+                    if (isGuest) { setPendingLessonId(lastSession.subtopicId); setShowGuestAlert(true); return; }
+                    setCurrentSubtopicId(lastSession.subtopicId);
+                    if (lastSession.skillTab) setSkillTab(lastSession.skillTab as SkillTab);
+                    setShowLessonGrid(false);
+                  }}
+                  className="w-full mb-4 p-4 rounded-xl bg-gradient-to-r from-lime-500/10 to-emerald-500/10 border border-lime-500/30 hover:border-lime-400/50 transition-all text-left group cursor-pointer"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="w-2 h-2 rounded-full bg-lime-400 animate-pulse flex-shrink-0"></span>
+                      <div>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-lime-400">Continúa donde lo dejaste</p>
+                        <p className="text-white text-sm font-bold group-hover:text-lime-300 transition-colors mt-0.5">
+                          {subtopicsList.find(s => s.subtopic_id === lastSession.subtopicId)?.title || lastSession.subtopicId}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-lime-500/60 group-hover:text-lime-400 transition-colors text-lg">→</span>
+                  </div>
+                </button>
+              )}
               <div className="lesson-grid-3d">
                 {subtopicsList && subtopicsList.length > 0 && subtopicsList.map((st) => {
                   const isActive = currentSubtopicId === st.subtopic_id;
@@ -1378,9 +1650,9 @@ function App() {
                     <button key={st.subtopic_id} onClick={() => {
                       if (isGuest) { setPendingLessonId(st.subtopic_id); setShowGuestAlert(true); return; }
                       setCurrentSubtopicId(st.subtopic_id);
-                      setTimeout(() => setShowLessonGrid(false), 300);
+                      setShowLessonGrid(false);
                     }}
-                      className={`lesson-btn-3d ${btnClass}`}>
+                      className={`lesson-btn-3d ${btnClass} ${isActive ? 'lesson-btn-just-selected' : ''}`}>
                       <span className="lesson-num">{st.sequence_order}</span>
                       <span className="lesson-title">{displayTitle}</span>
                       {isCompleted && <span className="lesson-check">✓</span>}

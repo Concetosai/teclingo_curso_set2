@@ -1497,6 +1497,41 @@
   animation: gridSlideIn 0.25s ease-out;
 }
 
+/* Lesson change flash animation */
+@keyframes lessonChangeFlash {
+  0% { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+  25% { border-color: rgba(59, 130, 246, 0.8); box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.4); }
+  50% { border-color: rgba(34, 211, 238, 0.9); box-shadow: 0 0 25px 6px rgba(34, 211, 238, 0.35); }
+  100% { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.lesson-change-flash {
+  animation: lessonChangeFlash 0.8s ease-out;
+}
+
+/* Bounce slow for arrow indicator */
+@keyframes bounceDownSlow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+.animate-bounce-slow {
+  animation: bounceDownSlow 1.8s ease-in-out infinite;
+}
+
+/* Just selected lesson button highlight */
+@keyframes lessonJustSelected {
+  0% { transform: scale(1); }
+  15% { transform: scale(1.08); }
+  30% { transform: scale(0.96); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.lesson-btn-just-selected {
+  animation: lessonJustSelected 0.5s ease-out;
+}
+
 /* Accessibility: disable all animations */
 @media (prefers-reduced-motion: reduce) {
   .close-btn-prominent {
@@ -1509,6 +1544,15 @@
     animation: none;
   }
   .lesson-grid-panel {
+    animation: none;
+  }
+  .lesson-change-flash {
+    animation: none;
+  }
+  .animate-bounce-slow {
+    animation: none;
+  }
+  .lesson-btn-just-selected {
     animation: none;
   }
 }
