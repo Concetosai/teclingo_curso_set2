@@ -281,10 +281,10 @@ function obtenerProgreso(datos) {
           avg_score: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10,
           lessons_completed: skillEntries.length,
           best_score: Math.max(...scores),
-          total_lessons: 10
+          total_lessons: 13
         };
       } else {
-        skill_stats[skill] = { avg_score: 0, lessons_completed: 0, best_score: 0, total_lessons: 10 };
+        skill_stats[skill] = { avg_score: 0, lessons_completed: 0, best_score: 0, total_lessons: 13 };
       }
     }
     
@@ -298,7 +298,7 @@ function obtenerProgreso(datos) {
     }
     
     const totalEntries = entries.length;
-    const totalPossible = 60;
+    const totalPossible = 78;
     const overallCompletion = totalPossible > 0 ? Math.round((totalEntries / totalPossible) * 1000) / 10 : 0;
     const allScores = entries.map(e => e.score);
     const avgAll = allScores.length > 0 ? Math.round((allScores.reduce((a, b) => a + b, 0) / allScores.length) * 10) / 10 : 0;

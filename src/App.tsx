@@ -116,20 +116,29 @@ function App() {
   const [showOnboardingManual, setShowOnboardingManual] = useState(false);
   const [_alternateExercises, setAlternateExercises] = useState<{[skill: string]: any}>({});
   const [openExercises, setOpenExercises] = useState<{[key: string]: boolean}>({});
-  const [showScrollHint, setShowScrollHint] = useState(() => {
-    return localStorage.getItem('teclingo_hide_scroll_hint') !== 'true';
-  });
   const [showGuestAlert, setShowGuestAlert] = useState(false);
   const [pendingLessonId, setPendingLessonId] = useState<string | null>(null);
   const [showHelpHint, setShowHelpHint] = useState(() => {
     return localStorage.getItem('teclingo_hide_help_hint') !== 'true';
   });
+  const [showScrollHint, setShowScrollHint] = useState(() => {
+    return localStorage.getItem('teclingo_hide_scroll_hint') !== 'true';
+  });
+  const scrollHintRef = useRef<HTMLDivElement>(null);
+  const generatedOptionsCacheRef = useRef<Record<string, string[]>>({});
   const [showCertAlert, setShowCertAlert] = useState(false);
   const isGuest = user?.email?.includes('teclingo.local') || false;
   const recRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
+  const lessonContentRef = useRef<HTMLDivElement>(null);
+  const skillsRef = useRef<HTMLDivElement>(null);
   const [loadingAlternate, setLoadingAlternate] = useState<string | null>(null);
   const [isAlternateMode, setIsAlternateMode] = useState<{[skill: string]: boolean}>({});
+  const [showLessonGrid, setShowLessonGrid] = useState(false);
+  const [showSkillsSection, setShowSkillsSection] = useState(false);
+  const [showMiniGames, setShowMiniGames] = useState(false);
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState<{[skill: string]: number}>({});
+  const [questionAttemptCount, setQuestionAttemptCount] = useState<{[key: string]: number}>({});
   
   // Estados para el Modal de Ayuda
   const [showHelp, setShowHelp] = useState(false);
@@ -151,8 +160,8 @@ function App() {
       instructions: [
         "Lee la oración o pregunta cuidadosamente.",
         "Selecciona la opción correcta o toca las palabras del banco para ordenar la oración.",
-        "Al terminar, presiona el botón morado 'Evaluar todo el bloque con IA'.",
-        "La IA te dirá si está bien o te dará una pista. ¡Tienes 2 intentos!",
+        "La IA evaluará tu respuesta automáticamente al seleccionarla.",
+        "¡Tienes 2 intentos por pregunta!",
         "Si te equivocas, revisa la 'Regla gramatical' que te sugiere la IA."
       ]
     },
@@ -162,7 +171,7 @@ function App() {
         "Primero, lee el texto y escucha el audio de referencia (si está disponible).",
         "Responde las preguntas escribiendo o seleccionando la palabra en inglés.",
         "Presta mucha atención a la ortografía (spelling).",
-        "Presiona 'Evaluar' para que la IA revise tus respuestas."
+        "La IA evaluará tu respuesta automáticamente al seleccionarla."
       ]
     },
     reading: {
@@ -281,13 +290,19 @@ function App() {
   const isSkillPerfect = (skill: string): boolean => {
     const fb = batchFeedbacks[skill];
     if (!fb?.results || fb.results.length === 0) return false;
-    return fb.results.every((r: any) => r.score === 100);
+    const exercises = getExercisesForSkill(skill);
+    if (exercises.length === 0) return false;
+    const answeredCount = fb.results.filter(Boolean).length;
+    return answeredCount >= exercises.length && fb.results.every((r: any) => r && r.score === 100);
   };
 
   const allSkillsCompleted = (): boolean => {
     const skills: SkillTab[] = ['grammar', 'vocabulary', 'reading', 'listening', 'writing', 'pronunciation'];
     return skills.every(s => completedSkills[s]);
   };
+
+  const lastLessonOrder = subtopicsList.length > 0 ? subtopicsList[subtopicsList.length - 1].sequence_order : 13;
+  const isExamUnlocked = (realProgress?.overall_completion || 0) >= 100 && (realProgress?.overall_average || 0) >= 70;
 
   const toggleExercise = (key: string) => {
     setOpenExercises(prev => ({ ...prev, [key]: !prev[key] }));
@@ -369,6 +384,8 @@ function App() {
     setBatchFeedbacks(saved?.batchFeedbacks || {});
     setAttempts(saved?.attempts || {});
     setSkillTab('grammar');
+    setCurrentQuestionIdx({});
+    setQuestionAttemptCount({});
     setLoading(true);
     const worldParam = userContext.institutional_world;
     Promise.all([
@@ -413,6 +430,35 @@ function App() {
   }, [currentSubtopicId, userContext.institutional_world, user, userId]);
 
   useEffect(() => {
+    if (localStorage.getItem('teclingo_hide_scroll_hint') !== 'true') {
+      setShowScrollHint(true);
+    }
+  }, [currentSubtopicId]);
+
+  useEffect(() => {
+    if (data && lessonContentRef.current) {
+      setTimeout(() => {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        lessonContentRef.current?.scrollIntoView({
+          behavior: prefersReducedMotion ? 'auto' : 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      }, 400);
+    }
+  }, [currentSubtopicId]);
+
+  useEffect(() => {
+    if (!showScrollHint || !skillsRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setShowScrollHint(false); },
+      { threshold: 0.3 }
+    );
+    observer.observe(skillsRef.current);
+    return () => observer.disconnect();
+  }, [showScrollHint, currentSubtopicId]);
+
+  const fetchProgress = () => {
     if (!user) return;
     fetch(`${API_BASE}/api/course/progress/${userId}?world=${userContext.institutional_world}`)
       .then(async (res) => {
@@ -426,7 +472,11 @@ function App() {
       })
       .then(data => { if (data) setRealProgress(data); })
       .catch((err) => { console.error('[API] ❌ Error en /progress:', err); });
-  }, [user, userContext.institutional_world, activeTab, evaluatingSkill, userId]);
+  };
+
+  useEffect(() => {
+    fetchProgress();
+  }, [user, userContext.institutional_world, userId]);
 
   useEffect(() => {
     if (!user) return;
@@ -441,15 +491,6 @@ function App() {
     if (!user || !currentSubtopicId) return;
     saveExerciseState(user.email, currentSubtopicId, { selectedAnswers, batchFeedbacks, attempts, completedSkills });
   }, [selectedAnswers, batchFeedbacks, attempts, completedSkills, user, currentSubtopicId]);
-
-  useEffect(() => {
-    if (!data || !showScrollHint) return;
-  }, [data, currentSubtopicId, showScrollHint]);
-
-  const dismissScrollHint = () => {
-    setShowScrollHint(false);
-    localStorage.setItem('teclingo_hide_scroll_hint', 'true');
-  };
 
   if (!user) {
     return (
@@ -533,58 +574,6 @@ function App() {
     setBatchFeedbacks(prev => { const n = {...prev}; delete n[skill]; return n; });
   };
 
-  const evaluateBatch = async (skill: SkillTab, exercises: any[]) => {
-    const currentAttempts = attempts[skill] || 0;
-    if (currentAttempts >= 2 || !exercises || exercises.length === 0) return;
-    if (currentAttempts === 0 && !exercises.some((ex: any, idx: number) => { const key = `${skill.charAt(0)}-${ex.id || idx}`; return selectedAnswers[key]; })) { alert("Por favor responde al menos un ejercicio antes de evaluar."); return; }
-    setEvaluatingSkill(skill);
-
-    const buildPayload = (exs: any[], offset: number) => exs.map((ex: any, i: number) => {
-      const key = `${skill.charAt(0)}-${ex.id || (offset + i)}`;
-      const isSpeaking = !!ex.prompt && !ex.answer && !ex.question;
-      let correctAnswer = isSpeaking ? extractSpokenPhrase(ex.prompt) : (ex.answer || ex.prompt || '');
-      if (!isSpeaking && ex.question && ex.answer) {
-        const fullCorrect = ex.question.replace(/_{2,}|\(\)/, ex.answer).replace(/\s+/g, ' ').trim();
-        correctAnswer = `${correctAnswer} (Full correct sentence: "${fullCorrect}")`;
-      }
-      return { question: ex.question || ex.prompt || `Ejercicio ${offset+i+1}`, user_answer: selectedAnswers[key] || '', correct_answer: correctAnswer };
-    });
-
-    try {
-      let combinedResult: any = { summary: '', results: [] };
-      if (skill === 'pronunciation' && exercises.length > 6) {
-        const batch1 = buildPayload(exercises.slice(0, 6), 0);
-        const batch2 = buildPayload(exercises.slice(6), 6);
-        const [res1, res2] = await Promise.all([
-          fetch(`${API_BASE}/api/course/feedback/batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch1, user_context: userContext }) }).then(r => r.json()),
-          fetch(`${API_BASE}/api/course/feedback/batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: batch2, user_context: userContext }) }).then(r => r.json())
-        ]);
-        combinedResult = {
-          summary: `${res1.summary || ''} ${res2.summary || ''}`.trim(),
-          results: [...(res1.results || []), ...(res2.results || [])]
-        };
-      } else {
-        const payload = buildPayload(exercises, 0);
-        const response = await fetch(`${API_BASE}/api/course/feedback/batch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ exercises: payload, user_context: userContext }) });
-        combinedResult = await response.json();
-      }
-
-      setBatchFeedbacks(prev => ({ ...prev, [skill]: combinedResult }));
-      const newAttempts = currentAttempts + 1;
-      setAttempts(prev => ({ ...prev, [skill]: newAttempts }));
-      if (combinedResult.results && combinedResult.results.length > 0) {
-        const scores = combinedResult.results.map((r: any) => r.score || 0);
-        const avgScore = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
-        fetch(`${API_BASE}/api/course/progress/save`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId, subtopic_id: currentSubtopicId, skill, score: Math.round(avgScore), attempts: newAttempts, world: userContext.institutional_world })
-        }).catch(() => {});
-        saveProgress({ subtopicId: currentSubtopicId, skill, score: Math.round(avgScore), attempts: newAttempts, world: userContext.institutional_world }).catch(() => {});
-        saveActivity('evaluacion', `${skill} - ${currentSubtopicId} - score:${Math.round(avgScore)}`).catch(() => {});
-      }
-    } catch (err) { console.error("Error:", err); alert("Error al conectar con la IA."); } finally { setEvaluatingSkill(null); }
-  };
-
   const speak = (text: string) => {
     if (recordingKey) { stopRecording(); return; }
     if (audioState.isPlaying && audioState.text === text) { ttsPause(); setAudioState({ isPlaying: false, text: '' }); return; }
@@ -607,7 +596,7 @@ function App() {
     setRecordingTime(0);
   };
 
-  const startRecording = (key: string) => {
+  const startRecording = (key: string, onResult?: (transcript: string) => void) => {
     if (audioState.isPlaying) stopAudio();
     // @ts-ignore
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -619,11 +608,13 @@ function App() {
     const timerInterval = setInterval(() => setRecordingTime(p => p + 1), 1000);
     timerRef.current = timerInterval;
     r.onresult = (e: any) => {
-      handleAnswerSelect(key, e.results[0][0].transcript);
+      const transcript = e.results[0][0].transcript;
+      handleAnswerSelect(key, transcript);
       clearInterval(timerInterval);
       timerRef.current = null;
       recRef.current = null;
       setRecordingKey(null);
+      if (onResult) onResult(transcript);
     };
     r.onerror = (e: any) => {
       clearInterval(timerInterval);
@@ -642,6 +633,160 @@ function App() {
   };
 
   const formatRecordTime = (s: number) => { const m = Math.floor(s / 60); const sec = s % 60; return `${m}:${sec.toString().padStart(2, '0')}`; };
+
+  const getExercisesForSkill = (skill: SkillTab): any[] => {
+    switch(skill) {
+      case 'grammar': return grammarExercises;
+      case 'vocabulary': return vocabularyExercises;
+      case 'reading': return readingExercises?.questions || [];
+      case 'listening': return listeningExercises?.questions || [];
+      case 'writing': return writingExercises;
+      case 'pronunciation': return speakingExercises;
+      default: return [];
+    }
+  };
+
+  const isSkillQuestionsDone = (skill: SkillTab): boolean => {
+    const exercises = getExercisesForSkill(skill);
+    const idx = currentQuestionIdx[skill] || 0;
+    return exercises.length > 0 && idx >= exercises.length;
+  };
+
+  const calculateSkillScore = (skill: SkillTab): number => {
+    const fbs = batchFeedbacks[skill]?.results || [];
+    const scores = fbs.filter(Boolean).map((r: any) => r.score || 0);
+    return scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0;
+  };
+
+  const generateOptionsFromAnswer = (correctAnswer: string, allVocab: string[]): string[] => {
+    if (!correctAnswer) return [];
+    const distractors = allVocab
+      .filter(w => w.length > 0 && w.toLowerCase() !== correctAnswer.toLowerCase())
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
+    const opts = [...distractors, correctAnswer].sort(() => Math.random() - 0.5);
+    return opts.length >= 2 ? opts : [correctAnswer];
+  };
+
+  const getGeneratedOptions = (key: string, correctAnswer: string, allVocab: string[]): string[] => {
+    if (!generatedOptionsCacheRef.current[key]) {
+      generatedOptionsCacheRef.current[key] = generateOptionsFromAnswer(correctAnswer, allVocab);
+    }
+    return generatedOptionsCacheRef.current[key];
+  };
+
+  const autoEvaluateQuestion = async (skill: SkillTab, qIdx: number, answer: string) => {
+    const exercises = getExercisesForSkill(skill);
+    const ex = exercises[qIdx];
+    if (!ex) return;
+
+    const qKey = `${skill}-${qIdx}`;
+    const currentQAttempts = questionAttemptCount[qKey] || 0;
+    if (currentQAttempts >= 2) return;
+
+    const correctAnswer = ex.answer || '';
+
+    const normalize = (s: string) => s.toLowerCase().replace(/[.,!?;:'"()\[\]{}]/g, '').replace(/\s+/g, ' ').trim();
+
+    const exactMatch = skill !== 'pronunciation' && correctAnswer && normalize(answer) === normalize(correctAnswer);
+
+    const isUnscramble = Array.isArray(ex.words) && ex.words.length > 0;
+    let unscrambleMatch = false;
+    if (!exactMatch && isUnscramble && skill !== 'pronunciation') {
+      const answerWords = normalize(answer).split(' ').filter(Boolean);
+      const bankWords = ex.words.map((w: string) => normalize(w));
+      const freq = (arr: string[]) => { const m: Record<string, number> = {}; arr.forEach(w => { m[w] = (m[w] || 0) + 1; }); return m; };
+      const answerFreq = freq(answerWords);
+      const bankFreq = freq(bankWords);
+      const usedAll = answerWords.length === bankWords.length &&
+        Object.keys(bankFreq).every(w => (answerFreq[w] || 0) === bankFreq[w]);
+      if (usedAll) {
+        const expectedNorm = normalize(correctAnswer);
+        const answerNorm = normalize(answer);
+        unscrambleMatch = answerNorm === expectedNorm;
+        if (!unscrambleMatch) {
+          const removeArticle = (s: string) => s.replace(/\b(the|a|an)\b/g, '').replace(/\s+/g, ' ').trim();
+          unscrambleMatch = removeArticle(answerNorm) === removeArticle(expectedNorm);
+        }
+      }
+    }
+
+    const localMatch = exactMatch || unscrambleMatch;
+
+    let fb: any;
+    if (localMatch) {
+      fb = {
+        is_correct: true,
+        score: 100,
+        feedback: unscrambleMatch && !exactMatch
+          ? '¡Correcto! Usaste todas las palabras del banco correctamente.'
+          : '¡Correcto! Tu respuesta coincide exactamente con la esperada.',
+        pedagogical_reason: 'Respuesta verificada localmente.',
+      };
+    } else {
+      const payload = [{
+        question: ex.question || ex.prompt || `Pregunta ${qIdx + 1}`,
+        user_answer: answer,
+        correct_answer: correctAnswer
+      }];
+
+      setEvaluatingSkill(skill);
+      try {
+        const response = await fetch(`${API_BASE}/api/course/feedback/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ exercises: payload, user_context: userContext })
+        });
+        const result = await response.json();
+        if (!result.results?.[0]) return;
+        fb = result.results[0];
+      } catch (err) {
+        console.error("Error:", err);
+        return;
+      } finally {
+        setEvaluatingSkill(null);
+      }
+    }
+
+    const newQAttempts = currentQAttempts + 1;
+    setQuestionAttemptCount(prev => ({ ...prev, [qKey]: newQAttempts }));
+
+    setBatchFeedbacks(prev => {
+      const existing = prev[skill] || { summary: '', results: [] };
+      const newResults = [...existing.results];
+      newResults[qIdx] = fb;
+      return { ...prev, [skill]: { summary: existing.summary, results: newResults } };
+    });
+
+    const isLastQ = qIdx >= exercises.length - 1;
+    let skillAttemptsForSave = attempts[skill] || 0;
+    if (isLastQ && (fb.is_correct || fb.score >= 80 || newQAttempts >= 2)) {
+      skillAttemptsForSave = (attempts[skill] || 0) + 1;
+      setAttempts(prev => ({ ...prev, [skill]: skillAttemptsForSave }));
+    }
+
+    const allFbs = [...((batchFeedbacks[skill]?.results || []))];
+    allFbs[qIdx] = fb;
+    const scores = allFbs.filter(Boolean).map((r: any) => r.score || 0);
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0;
+
+    Promise.all([
+      fetch(`${API_BASE}/api/course/progress/save`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, subtopic_id: currentSubtopicId, skill, score: avgScore, attempts: skillAttemptsForSave, world: userContext.institutional_world })
+      }),
+      saveProgress({ subtopicId: currentSubtopicId, skill, score: avgScore, attempts: skillAttemptsForSave, world: userContext.institutional_world }),
+      saveActivity('evaluacion', `${skill} - ${currentSubtopicId} - score:${avgScore}`)
+    ]).catch(() => {});
+
+    if (fb.is_correct || fb.score >= 80 || newQAttempts >= 2) {
+      setTimeout(() => {
+        setCurrentQuestionIdx(prev => ({ ...prev, [skill]: qIdx + 1 }));
+      }, fb.is_correct || fb.score >= 80 ? 1200 : 2500);
+    }
+
+    fetchProgress();
+  };
 
   const getScoreColor = (score: number) => score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400';
   const getBorderColor = (score: number) => score >= 80 ? 'border-green-700' : score >= 50 ? 'border-yellow-700' : 'border-red-700';
@@ -677,7 +822,7 @@ function App() {
               <button onClick={() => { setActiveTab('progress'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'progress' ? 'nav-active-green' : 'nav-btn-inactive'}`}><span className="nav-icon">📊</span> Progreso</button>
               <button onClick={() => { setActiveTab('library'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'library' ? 'nav-active-amber' : 'nav-btn-inactive'}`}><span className="nav-icon">📚</span> Librería</button>
               <button onClick={() => { setActiveTab('settings'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'settings' ? 'nav-active-purple' : 'nav-btn-inactive'}`}><span className="nav-icon">⚙️</span> Ajustes</button>
-              <button onClick={() => { setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`}><span className="nav-icon">📝</span> Examen</button>
+              <button onClick={() => { if (!isExamUnlocked) { setShowCertAlert(true); return; } setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`} title={!isExamUnlocked ? 'Completa todas las lecciones con promedio 70+ para desbloquear' : 'Ir al Examen A1'}><span className="nav-icon">{isExamUnlocked ? '📝' : '🔒'}</span> Examen</button>
               <button onClick={() => { setActiveTab('games'); setGameType(null); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'games' ? 'nav-active-pink' : 'nav-btn-inactive'}`}><span className="nav-icon">🎮</span> Juegos</button>
               <button
                 onClick={openOnboarding}
@@ -698,7 +843,7 @@ function App() {
               <button onClick={() => { setActiveTab('progress'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'progress' ? 'nav-active-green' : 'nav-btn-inactive'}`}><span className="nav-icon">📊</span> Progreso</button>
               <button onClick={() => { setActiveTab('library'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'library' ? 'nav-active-amber' : 'nav-btn-inactive'}`}><span className="nav-icon">📚</span> Librería</button>
               <button onClick={() => { setActiveTab('settings'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'settings' ? 'nav-active-purple' : 'nav-btn-inactive'}`}><span className="nav-icon">⚙️</span> Ajustes</button>
-              <button onClick={() => { setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`}><span className="nav-icon">📝</span> Examen</button>
+              <button onClick={() => { if (!isExamUnlocked) { setShowCertAlert(true); return; } setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`} title={!isExamUnlocked ? 'Completa todas las lecciones con promedio 70+ para desbloquear' : 'Ir al Examen A1'}><span className="nav-icon">{isExamUnlocked ? '📝' : '🔒'}</span> Examen</button>
               <button onClick={() => { setActiveTab('games'); setGameType(null); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'games' ? 'nav-active-pink' : 'nav-btn-inactive'}`}><span className="nav-icon">🎮</span> Juegos</button>
               <button
                 onClick={() => { openOnboarding(); setNavOpen(false); }}
@@ -724,76 +869,151 @@ function App() {
                 )}
 
                 {!realProgress.a1_achieved && (
-                  <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-700 p-6 rounded-2xl shadow-lg">
-                    <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">🗺️ Tu Camino hacia la Certificación A1</h3>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex-1 group/bar">
-                        <div className="flex justify-between text-sm text-slate-300 mb-1">
-                          <span>Progreso Total</span>
-                          <span className="font-bold text-blue-400">{realProgress.overall_completion}%</span>
+                  <div className="space-y-6">
+
+                    {/* === SECCION 1: Barra principal + stats === */}
+                    <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-700 p-6 rounded-2xl shadow-lg">
+                      <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">🗺️ Tu Camino hacia la Certificación A1</h3>
+
+                      {/* Barra Progreso Total */}
+                      <div className="mb-5">
+                        <div className="flex justify-between items-baseline mb-1.5">
+                          <span className="text-sm font-semibold text-slate-200">Progreso Total</span>
+                          <span className="text-lg font-bold text-blue-400">{realProgress.overall_completion}%</span>
                         </div>
-                        <div className="w-full bg-slate-700 rounded-full h-4 relative overflow-visible">
-                          <div className="bg-gradient-to-r from-blue-600 to-indigo-500 h-4 rounded-full transition-all relative z-0" style={{ width: `${realProgress.overall_completion}%` }}></div>
-                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white z-10">{realProgress.overall_completion}%</div>
-                          <div className="absolute top-full left-0 right-0 mt-2 opacity-0 group-hover/bar:opacity-100 transition-opacity duration-300 pointer-events-none group-hover/bar:pointer-events-auto z-20">
-                            <div className="flex gap-1 items-end">
-                              {subtopicsList.map((st, idx) => {
-                                const totalLessons = subtopicsList.length;
-                                const widthPct = totalLessons > 0 ? (100 / totalLessons) : 10;
-                                const skills = ['grammar','vocabulary','reading','listening','writing','pronunciation'];
-                                const hasProgress = skills.some(s => {
-                                  const sStats = realProgress.skill_stats?.[s];
-                                  return sStats && sStats.lessons_completed > 0 && st.sequence_order <= sStats.lessons_completed;
-                                });
-                                const isCompleted = st.sequence_order === 10 || (realProgress.a1_skills_passed && Object.values(realProgress.a1_skills_passed).some(Boolean) && st.sequence_order <= 3);
-                                let barColor = 'bg-slate-600';
-                                if (isCompleted) barColor = 'bg-green-500';
-                                else if (hasProgress) barColor = 'bg-amber-400';
-                                return (
-                                  <div key={st.subtopic_id} className="flex flex-col items-center" style={{ width: `${widthPct}%` }}>
-                                    <div className={`w-full h-1.5 rounded-full ${barColor} transition-all`} style={{ minHeight: '4px' }}></div>
-                                    <span className="text-[9px] text-slate-500 mt-0.5 leading-none">{idx + 1}</span>
-                                  </div>
-                                );
-                              })}
+                        <div className="w-full bg-slate-700 rounded-full h-5 relative overflow-visible">
+                          <div className="bg-gradient-to-r from-blue-600 to-indigo-500 h-5 rounded-full transition-all" style={{ width: `${Math.max(realProgress.overall_completion, 2)}%` }}></div>
+                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow-lg">{realProgress.overall_completion > 5 ? `${realProgress.overall_completion}%` : ''}</div>
+                          {/* Subtopic indicators */}
+                          {subtopicsList.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 z-20">
+                              <div className="flex gap-0.5 items-end">
+                                {subtopicsList.map((st, idx) => {
+                                  const totalLessons = subtopicsList.length;
+                                  const widthPct = totalLessons > 0 ? (100 / totalLessons) : 10;
+                                  const skills = ['grammar','vocabulary','reading','listening','writing','pronunciation'];
+                                  const hasProgress = skills.some(s => {
+                                    const sStats = realProgress.skill_stats?.[s];
+                                    return sStats && sStats.lessons_completed > 0 && st.sequence_order <= sStats.lessons_completed;
+                                  });
+                                  const isCompleted = st.sequence_order === lastLessonOrder || (realProgress.a1_skills_passed && Object.values(realProgress.a1_skills_passed).some(Boolean) && st.sequence_order <= 3);
+                                  let barColor = 'bg-slate-600';
+                                  if (isCompleted) barColor = 'bg-green-500';
+                                  else if (hasProgress) barColor = 'bg-amber-400';
+                                  return (
+                                    <div key={st.subtopic_id} className="group/bar relative flex flex-col items-center cursor-pointer" style={{ width: `${widthPct}%` }}>
+                                      <div className={`w-full h-2 rounded-sm ${barColor} transition-all group-hover/bar:h-3`} style={{ minHeight: '6px' }}></div>
+                                      <span className="text-[9px] text-slate-500 mt-0.5 leading-none group-hover/bar:text-white transition-colors">{idx + 1}</span>
+                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 pointer-events-none z-30 whitespace-nowrap">
+                                        <div className="bg-slate-800 border border-slate-600 text-white text-[10px] font-semibold px-2 py-1 rounded-lg shadow-lg">
+                                          <span className="text-blue-300">#{idx + 1}</span> {st.title}
+                                        </div>
+                                        <div className="w-2 h-2 bg-slate-800 border-b border-r border-slate-600 rotate-45 mx-auto -mt-1"></div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex gap-3 mt-1.5 justify-center">
+                                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>Completada</span>
+                                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>En progreso</span>
+                                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>Sin iniciar</span>
+                              </div>
                             </div>
-                            <div className="flex gap-3 mt-1.5 justify-center">
-                              <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>Completada</span>
-                              <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>En progreso</span>
-                              <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>Sin iniciar</span>
-                            </div>
-                          </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3 mini stats */}
+                      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-blue-800/40">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-white">{realProgress.overall_average}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">Promedio General</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-blue-300">{realProgress.total_entries}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">Ejercicios</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-indigo-300 capitalize">{(realProgress.world || userContext.institutional_world).replace('_', ' ')}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">Tu Mundo</p>
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {Object.entries(realProgress.skill_stats || {}).map(([skill, stats]: [string, any]) => {
-                        const thresholds: Record<string, number> = { grammar: 70, vocabulary: 70, reading: 60, listening: 60, writing: 60, pronunciation: 60 };
-                        const icons: Record<string, string> = { grammar: '📝', vocabulary: '📚', reading: '📖', listening: '🎧', writing: '✍️', pronunciation: '🎤' };
-                        const labels: Record<string, string> = { grammar: 'Grammar', vocabulary: 'Vocabulary', reading: 'Reading', listening: 'Listening', writing: 'Writing', pronunciation: 'Speaking' };
-                        const passed = realProgress.a1_skills_passed?.[skill] || false;
-                        const threshold = thresholds[skill] || 60;
-                        const avg = stats.avg_score || 0;
-                        const pct = Math.min(avg, 100);
-                        return (
-                          <div key={skill} className={`p-3 rounded-xl border-2 transition-all ${passed ? 'bg-green-900/30 border-green-600' : 'bg-slate-800/50 border-slate-700'}`}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold ${passed ? 'bg-green-600 text-white' : 'bg-slate-600 text-slate-300'}`}>
-                                {passed ? '✓' : (stats.lessons_completed > 0 ? Math.round(pct / 10) : '—')}
-                              </span>
-                              <span className="text-sm font-semibold text-white">{icons[skill]} {labels[skill]}</span>
+
+                    {/* === SECCION 2: Habilidades A1 === */}
+                    <div className="panel-3d overflow-hidden">
+                      <button
+                        onClick={() => setShowSkillsSection(!showSkillsSection)}
+                        className="w-full flex items-center justify-between p-6 pb-0 cursor-pointer text-left"
+                      >
+                        <div>
+                          <h3 className="text-lg font-bold text-white mb-1">📊 Habilidades A1</h3>
+                          {!showSkillsSection && (
+                            <p className="text-slate-400 text-xs">Promedio por habilidad. Toca para expandir.</p>
+                          )}
+                        </div>
+                        <svg className={`w-5 h-5 text-slate-400 transition-transform duration-300 flex-shrink-0 ${showSkillsSection ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      <div className={`skills-section-body ${showSkillsSection ? 'open' : ''}`}>
+                        <div className="px-6 pb-6 pt-2">
+                          <p className="text-slate-400 text-xs mb-5">Promedio por habilidad. Necesitas alcanzar la meta para aprobar el nivel A1.</p>
+                      <div className="space-y-4">
+                        {Object.entries(realProgress.skill_stats || {}).map(([skill, stats]: [string, any]) => {
+                          const thresholds: Record<string, number> = { grammar: 70, vocabulary: 70, reading: 60, listening: 60, writing: 60, pronunciation: 60 };
+                          const icons: Record<string, string> = { grammar: '📝', vocabulary: '📚', reading: '📖', listening: '🎧', writing: '✍️', pronunciation: '🎤' };
+                          const labels: Record<string, string> = { grammar: 'Grammar', vocabulary: 'Vocabulary', reading: 'Reading', listening: 'Listening', writing: 'Writing', pronunciation: 'Speaking' };
+                          const passed = realProgress.a1_skills_passed?.[skill] || false;
+                          const threshold = thresholds[skill] || 60;
+                          const avg = stats.avg_score || 0;
+                          const pct = Math.min(avg, 100);
+                          const lessonsDone = stats.lessons_completed || 0;
+                          const lessonsTotal = stats.total_lessons || lastLessonOrder;
+                          const lessonPct = lessonsTotal > 0 ? (lessonsDone / lessonsTotal) * 100 : 0;
+                          return (
+                            <div key={skill} className={`p-4 rounded-xl border transition-all ${passed ? 'bg-green-900/20 border-green-600/50' : 'bg-slate-800/40 border-slate-700/60'}`}>
+                              {/* Title row */}
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{icons[skill]}</span>
+                                  <span className="text-sm font-bold text-white">{labels[skill]}</span>
+                                </div>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${passed ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                                  {passed ? '✅ A1 PASS' : `Meta: ${threshold}+`}
+                                </span>
+                              </div>
+                              {/* Score bar */}
+                              <div className="mb-2">
+                                <div className="flex justify-between items-baseline mb-1">
+                                  <span className="text-xs text-slate-400">Promedio</span>
+                                  <span className="text-sm font-bold text-white">{avg}<span className="text-slate-500 font-normal">/100</span></span>
+                                </div>
+                                <div className="w-full bg-slate-700 rounded-full h-3 relative">
+                                  <div className={`h-3 rounded-full transition-all ${passed ? 'bg-green-500' : avg >= threshold * 0.7 ? 'bg-amber-400' : avg > 0 ? 'bg-blue-500' : 'bg-slate-600'}`} style={{ width: `${Math.max(pct, avg > 0 ? 3 : 0)}%` }}></div>
+                                  <div className="absolute top-0 h-full w-0.5 bg-white/50 z-10" style={{ left: `${threshold}%` }} title={`Meta A1: ${threshold}`}></div>
+                                </div>
+                              </div>
+                              {/* Lessons progress */}
+                              <div>
+                                <div className="flex justify-between items-baseline mb-1">
+                                  <span className="text-xs text-slate-400">Lecciones</span>
+                                  <span className="text-xs font-semibold text-slate-300">{lessonsDone}<span className="text-slate-500">/{lessonsTotal}</span></span>
+                                </div>
+                                <div className="w-full bg-slate-700 rounded-full h-1.5">
+                                  <div className="h-1.5 rounded-full bg-indigo-500 transition-all" style={{ width: `${Math.max(lessonPct, lessonsDone > 0 ? 5 : 0)}%` }}></div>
+                                </div>
+                              </div>
                             </div>
-                            <div className="w-full bg-slate-700 rounded-full h-2 mb-1">
-                              <div className={`h-2 rounded-full ${passed ? 'bg-green-500' : avg >= threshold * 0.7 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }}></div>
-                            </div>
-                            <div className="flex justify-between text-xs text-slate-400">
-                              <span>{avg}/100</span>
-                              <span>{passed ? '✅' : `Meta: ${threshold}+`}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                        </div>
+                      </div>
+                      </div>
                     </div>
+
+                    {/* === SECCION 3: Siguiente paso === */}
                     {(() => {
                       const thresholds: Record<string, number> = { grammar: 70, vocabulary: 70, reading: 60, listening: 60, writing: 60, pronunciation: 60 };
                       const icons: Record<string, string> = { grammar: '📝', vocabulary: '📚', reading: '📖', listening: '🎧', writing: '✍️', pronunciation: '🎤' };
@@ -804,74 +1024,21 @@ function App() {
                       const [worstSkill, worstStats] = weakest as [string, any];
                       const diff = (thresholds[worstSkill] || 60) - (worstStats.avg_score || 0);
                       return (
-                        <div className="bg-slate-900/50 p-4 rounded-xl border border-amber-600 mt-4">
+                        <div className="bg-gradient-to-r from-amber-900/30 to-orange-900/30 p-5 rounded-xl border border-amber-600/50">
                           <p className="text-amber-400 font-bold text-sm mb-1">💡 Siguiente Paso Recomendado</p>
                           <p className="text-slate-300 text-sm">
                             Tu habilidad más baja es <span className="text-white font-bold">{icons[worstSkill]} {labels[worstSkill]}</span> con {worstStats.avg_score}/100.
                             Necesitas <span className="text-amber-400 font-bold">+{Math.max(0, Math.round(diff))} puntos</span> para alcanzar el umbral A1 de {thresholds[worstSkill]}%.
                           </p>
-                          <button onClick={() => setActiveTab('lesson')} className="mt-3 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold">
+                          <button onClick={() => setActiveTab('lesson')} className="mt-3 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold transition-all">
                             📚 Practicar {labels[worstSkill]} ahora
                           </button>
                         </div>
                       );
                     })()}
+
                   </div>
                 )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="stat-card-3d p-6">
-                    <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">Progreso del Módulo</p>
-                    <div className="flex items-end gap-2 mt-2"><span className="text-4xl font-bold text-white">{realProgress.overall_completion}%</span><span className="text-slate-500 mb-1">completado</span></div>
-                    <div className="w-full bg-slate-700 rounded-full h-2.5 mt-4"><div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${realProgress.overall_completion}%` }}></div></div>
-                  </div>
-                  <div className="stat-card-3d p-6">
-                    <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">🎯 Promedio General</p>
-                    <div className="flex items-end gap-2 mt-2"><span className="text-4xl font-bold text-amber-400">{realProgress.overall_average}</span><span className="text-slate-500 mb-1">/ 100</span></div>
-                    <div className="w-full bg-slate-700 rounded-full h-2.5 mt-4"><div className="bg-amber-500 h-2.5 rounded-full" style={{ width: `${realProgress.overall_average}%` }}></div></div>
-                  </div>
-                  <div className="stat-card-3d p-6">
-                    <p className="text-slate-400 text-sm font-semibold uppercase tracking-wide">🌍 Mundo</p>
-                    <div className="flex items-end gap-2 mt-2"><span className="text-2xl font-bold text-blue-400 capitalize">{realProgress.world || userContext.institutional_world.replace('_', ' ')}</span></div>
-                    <p className="text-slate-500 text-xs mt-2">{realProgress.total_entries} ejercicios evaluados</p>
-                  </div>
-                </div>
-
-                <div className="panel-3d p-6">
-                  <h3 className="text-lg font-bold text-white mb-4">📊 Detalle por Habilidad</h3>
-                  <div className="space-y-4">
-                    {Object.entries(realProgress.skill_stats || {}).map(([skill, stats]: [string, any]) => {
-                      const thresholds: Record<string, number> = { grammar: 70, vocabulary: 70, reading: 60, listening: 60, writing: 60, pronunciation: 60 };
-                      const passed = realProgress.a1_skills_passed?.[skill] || false;
-                      const threshold = thresholds[skill] || 60;
-                      const icons: Record<string, string> = { grammar: '📝', vocabulary: '📚', reading: '📖', listening: '🎧', writing: '✍️', pronunciation: '🎤' };
-                      return (
-                        <div key={skill} className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-white font-medium">{icons[skill]} {skill.charAt(0).toUpperCase() + skill.slice(1)}</span>
-                            <span className={`text-sm font-bold ${passed ? 'text-green-400' : 'text-slate-400'}`}>
-                              {passed ? '✅ A1 PASS' : `⚠️ Need ${threshold}+`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="flex-1">
-                              <div className="flex justify-between text-xs text-slate-400 mb-1">
-                                <span>Promedio: {stats.avg_score}/100</span>
-                                <span>{stats.lessons_completed}/{stats.total_lessons} lecciones</span>
-                              </div>
-                              <div className="w-full bg-slate-700 rounded-full h-3">
-                                <div className={`h-3 rounded-full transition-all ${stats.avg_score >= threshold ? 'bg-green-500' : stats.avg_score >= threshold * 0.7 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min(stats.avg_score, 100)}%` }}></div>
-                              </div>
-                              <div className="w-full bg-slate-700 rounded-full h-1 mt-1 relative">
-                                <div className="absolute top-0 h-1 w-0.5 bg-white" style={{ left: `${threshold}%` }}></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
 
                 <div className="panel-3d p-6">
                   <h3 className="text-lg font-bold text-white mb-4">🚀 Acciones Rápidas</h3>
@@ -882,10 +1049,10 @@ function App() {
                         <p className="text-blue-100/70 text-xs mt-1">Mejora tus habilidades con ejercicios</p>
                       </div>
                     </button>
-                    <button onClick={() => setActiveTab('exam')} className="action-btn-3d action-btn-amber p-4 text-left justify-start">
+                    <button onClick={() => { if (!isExamUnlocked) { setShowCertAlert(true); return; } setActiveTab('exam'); }} className={`action-btn-3d action-btn-amber p-4 text-left justify-start ${!isExamUnlocked ? 'opacity-60' : ''}`} title={!isExamUnlocked ? 'Completa todas las lecciones con promedio 70+ para desbloquear' : 'Tomar Examen A1'}>
                       <div>
-                        <p className="font-bold text-sm">📝 Tomar Examen A1</p>
-                        <p className="text-amber-100/70 text-xs mt-1">Certifica tu nivel</p>
+                        <p className="font-bold text-sm">{isExamUnlocked ? '📝' : '🔒'} Tomar Examen A1</p>
+                        <p className="text-amber-100/70 text-xs mt-1">{isExamUnlocked ? 'Certifica tu nivel' : 'Completa las lecciones primero'}</p>
                       </div>
                     </button>
                     <button onClick={() => setActiveTab('library')} className="action-btn-3d action-btn-purple p-4 text-left justify-start">
@@ -975,74 +1142,92 @@ function App() {
           <div className="space-y-6 animate-in fade-in duration-300">
             {!gameType ? (
               <>
-                <div className="panel-header-3d panel-header-pink p-6">
-                  <h2 className="text-2xl font-bold text-pink-400 mb-2">🎮 Mini-Juegos</h2>
-                  <p className="text-slate-300 text-sm">Practica inglés de forma divertida con juegos interactivos. ¡Usa el vocabulario y gramática de la lección actual!</p>
-                </div>
-
-                <div className="panel-3d p-4">
-                  <p className="text-sm text-slate-400 mb-3">Selecciona una habilidad para practicar:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {skillLabels.map(s => (
-                      <button key={s.key} onClick={() => setGameSkill(s.key)} className={`skill-tab-3d ${gameSkill === s.key ? 'skill-tab-active' : 'skill-tab-inactive'}`}>
-                        {s.icon} {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <button onClick={() => setGameType('true_false')} className="game-card-3d game-card-green p-6 text-left">
-                    <p className="text-3xl mb-2">✅</p>
-                    <h3 className="text-white font-bold">True / False</h3>
-                    <p className="text-slate-400 text-sm mt-1">Determina si las oraciones son correctas</p>
-                    <p className="text-green-400 text-xs mt-2">📝 Grammar · 📚 Vocabulary</p>
-                  </button>
-                  <button onClick={() => setGameType('flashcards')} className="game-card-3d game-card-purple p-6 text-left">
-                    <p className="text-3xl mb-2">🃏</p>
-                    <h3 className="text-white font-bold">Flashcards</h3>
-                    <p className="text-slate-400 text-sm mt-1">Voltea tarjetas para memorizar vocabulario</p>
-                    <p className="text-purple-400 text-xs mt-2">📚 Vocabulary</p>
-                  </button>
-                  <button onClick={() => setGameType('hangman')} className="game-card-3d game-card-orange p-6 text-left">
-                    <p className="text-3xl mb-2">💀</p>
-                    <h3 className="text-white font-bold">Hangman</h3>
-                    <p className="text-slate-400 text-sm mt-1">Adivina la palabra letra por letra</p>
-                    <p className="text-orange-400 text-xs mt-2">📚 Vocabulary · 📝 Grammar</p>
-                  </button>
-                  <button onClick={() => setGameType('drag_drop')} className="game-card-3d game-card-cyan p-6 text-left">
-                    <p className="text-3xl mb-2">🎯</p>
-                    <h3 className="text-white font-bold">Emparejar</h3>
-                    <p className="text-slate-400 text-sm mt-1">Conecta palabras con sus traducciones</p>
-                    <p className="text-cyan-400 text-xs mt-2">📚 Vocabulary</p>
-                  </button>
-                  <button onClick={() => setGameType('timer_quiz')} className="game-card-3d game-card-yellow p-6 text-left">
-                    <p className="text-3xl mb-2">⏱️</p>
-                    <h3 className="text-white font-bold">Quiz Reloj</h3>
-                    <p className="text-slate-400 text-sm mt-1">Responde rápido antes de que se agote el tiempo</p>
-                    <p className="text-yellow-400 text-xs mt-2">📝 All Skills</p>
-                  </button>
-                  <button onClick={() => setGameType('ai_conversation')} className="game-card-3d game-card-blue p-6 text-left">
-                    <p className="text-3xl mb-2">🗣️</p>
-                    <h3 className="text-white font-bold">AI Conversation</h3>
-                    <p className="text-slate-400 text-sm mt-1">Chatea con el tutor de IA en inglés</p>
-                    <p className="text-blue-400 text-xs mt-2">🎤 Speaking · ✍️ Writing</p>
-                  </button>
-                </div>
-
-                {Object.keys(gameResults).length > 0 && (
-                  <div className="panel-3d p-4">
-                    <h3 className="text-white font-bold mb-3">📊 Resultados Recientes</h3>
-                    <div className="space-y-2">
-                      {Object.entries(gameResults).map(([game, score]) => (
-                        <div key={game} className="flex items-center justify-between text-sm">
-                          <span className="text-slate-300 capitalize">{game.replace('_', ' ')}</span>
-                          <span className={`font-bold ${score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>{score}%</span>
-                        </div>
-                      ))}
+                <div className="panel-header-3d panel-header-pink overflow-hidden">
+                  <button
+                    onClick={() => setShowMiniGames(!showMiniGames)}
+                    className="w-full flex items-center justify-between p-6 pb-0 cursor-pointer text-left"
+                  >
+                    <div>
+                      <h2 className="text-2xl font-bold text-pink-400 mb-1">🎮 Mini-Juegos</h2>
+                      {!showMiniGames && (
+                        <p className="text-slate-400 text-xs">Practica inglés de forma divertida. Toca para expandir.</p>
+                      )}
                     </div>
+                    <svg className={`w-5 h-5 text-slate-400 transition-transform duration-300 flex-shrink-0 ${showMiniGames ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className={`skills-section-body ${showMiniGames ? 'open' : ''}`}>
+                  <div className="px-0 pb-2 pt-2">
+                    <p className="text-slate-300 text-sm mb-4 px-1">Practica inglés de forma divertida con juegos interactivos. ¡Usa el vocabulario y gramática de la lección actual!</p>
+
+                    <div className="panel-3d p-4">
+                      <p className="text-sm text-slate-400 mb-3">Selecciona una habilidad para practicar:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {skillLabels.map(s => (
+                          <button key={s.key} onClick={() => setGameSkill(s.key)} className={`skill-tab-3d ${gameSkill === s.key ? 'skill-tab-active' : 'skill-tab-inactive'}`}>
+                            {s.icon} {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <button onClick={() => setGameType('true_false')} className="game-card-3d game-card-green p-6 text-left">
+                        <p className="text-3xl mb-2">✅</p>
+                        <h3 className="text-white font-bold">True / False</h3>
+                        <p className="text-slate-400 text-sm mt-1">Determina si las oraciones son correctas</p>
+                        <p className="text-green-400 text-xs mt-2">📝 Grammar · 📚 Vocabulary</p>
+                      </button>
+                      <button onClick={() => setGameType('flashcards')} className="game-card-3d game-card-purple p-6 text-left">
+                        <p className="text-3xl mb-2">🃏</p>
+                        <h3 className="text-white font-bold">Flashcards</h3>
+                        <p className="text-slate-400 text-sm mt-1">Voltea tarjetas para memorizar vocabulario</p>
+                        <p className="text-purple-400 text-xs mt-2">📚 Vocabulary</p>
+                      </button>
+                      <button onClick={() => setGameType('hangman')} className="game-card-3d game-card-orange p-6 text-left">
+                        <p className="text-3xl mb-2">💀</p>
+                        <h3 className="text-white font-bold">Hangman</h3>
+                        <p className="text-slate-400 text-sm mt-1">Adivina la palabra letra por letra</p>
+                        <p className="text-orange-400 text-xs mt-2">📚 Vocabulary · 📝 Grammar</p>
+                      </button>
+                      <button onClick={() => setGameType('drag_drop')} className="game-card-3d game-card-cyan p-6 text-left">
+                        <p className="text-3xl mb-2">🎯</p>
+                        <h3 className="text-white font-bold">Emparejar</h3>
+                        <p className="text-slate-400 text-sm mt-1">Conecta palabras con sus traducciones</p>
+                        <p className="text-cyan-400 text-xs mt-2">📚 Vocabulary</p>
+                      </button>
+                      <button onClick={() => setGameType('timer_quiz')} className="game-card-3d game-card-yellow p-6 text-left">
+                        <p className="text-3xl mb-2">⏱️</p>
+                        <h3 className="text-white font-bold">Quiz Reloj</h3>
+                        <p className="text-slate-400 text-sm mt-1">Responde rápido antes de que se agote el tiempo</p>
+                        <p className="text-yellow-400 text-xs mt-2">📝 All Skills</p>
+                      </button>
+                      <button onClick={() => setGameType('ai_conversation')} className="game-card-3d game-card-blue p-6 text-left">
+                        <p className="text-3xl mb-2">🗣️</p>
+                        <h3 className="text-white font-bold">AI Conversation</h3>
+                        <p className="text-slate-400 text-sm mt-1">Chatea con el tutor de IA en inglés</p>
+                        <p className="text-blue-400 text-xs mt-2">🎤 Speaking · ✍️ Writing</p>
+                      </button>
+                    </div>
+
+                    {Object.keys(gameResults).length > 0 && (
+                      <div className="panel-3d p-4">
+                        <h3 className="text-white font-bold mb-3">📊 Resultados Recientes</h3>
+                        <div className="space-y-2">
+                          {Object.entries(gameResults).map(([game, score]) => (
+                            <div key={game} className="flex items-center justify-between text-sm">
+                              <span className="text-slate-300 capitalize">{game.replace('_', ' ')}</span>
+                              <span className={`font-bold ${score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>{score}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </>
             ) : (
               <div className="space-y-6">
@@ -1136,21 +1321,65 @@ function App() {
 
         {activeTab === 'lesson' && (
           <div className="space-y-8">
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700/50 shadow-2xl">
-              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                Selecciona una lección:
-              </h3>
+            {/* BARRA COMPACTA DE LECCIÓN ACTUAL (cuando la grilla está colapsada) */}
+            {!showLessonGrid && data && (
+              <div className="bg-slate-800/80 p-4 rounded-2xl border border-blue-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    #{subtopicsList.find(s => s.subtopic_id === currentSubtopicId)?.sequence_order || '?'}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Lección actual</p>
+                    <p className="text-white font-bold text-sm truncate">{adaptText(data.title)}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowLessonGrid(true)}
+                  className="flex-shrink-0 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-xl text-sm font-semibold transition-all border border-slate-600 hover:border-blue-500"
+                >
+                  📋 Cambiar
+                </button>
+              </div>
+            )}
+
+            {/* GRILLA DE LECCIONES (solo visible cuando showLessonGrid es true o no hay data) */}
+            {(showLessonGrid || !data) && (
+            <div className="relative bg-slate-900 p-5 rounded-2xl border border-slate-700/50 shadow-2xl lesson-grid-panel">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                  Selecciona una lección:
+                </h3>
+                {data && (
+                  <button
+                    onClick={() => setShowLessonGrid(false)}
+                    aria-label="Cerrar panel de lecciones y ver contenido"
+                    className="close-btn-prominent"
+                  >
+                    Cerrar y ver lección ↓
+                  </button>
+                )}
+              </div>
+              {data && (
+                <div className="mb-3 text-center animate-pulse-slow">
+                  <p className="text-cyan-300 text-sm font-bold mb-1 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">Cierra la ventana y desliza hacia abajo para ver habilidades y retos</p>
+                  <span className="bounce-arrow text-cyan-400 text-2xl drop-shadow-[0_0_12px_rgba(34,211,238,0.6)]">⬇</span>
+                </div>
+              )}
               <div className="lesson-grid-3d">
                 {subtopicsList && subtopicsList.length > 0 && subtopicsList.map((st) => {
                   const isActive = currentSubtopicId === st.subtopic_id;
-                  const isCompleted = st.sequence_order === 10 || (currentSubtopicId === st.subtopic_id && allSkillsCompleted());
+                  const isCompleted = st.sequence_order === lastLessonOrder || (currentSubtopicId === st.subtopic_id && allSkillsCompleted());
                   const btnClass = isActive ? 'lesson-btn-active' : isCompleted ? 'lesson-btn-completed' : 'lesson-btn-pending';
                   const displayTitle = adaptText(st.title) && adaptText(st.title).length > 28
                     ? adaptText(st.title).substring(0, 28) + '...'
                     : adaptText(st.title);
                   return (
-                    <button key={st.subtopic_id} onClick={() => { if (isGuest) { setPendingLessonId(st.subtopic_id); setShowGuestAlert(true); return; } setCurrentSubtopicId(st.subtopic_id); }}
+                    <button key={st.subtopic_id} onClick={() => {
+                      if (isGuest) { setPendingLessonId(st.subtopic_id); setShowGuestAlert(true); return; }
+                      setCurrentSubtopicId(st.subtopic_id);
+                      setTimeout(() => setShowLessonGrid(false), 300);
+                    }}
                       className={`lesson-btn-3d ${btnClass}`}>
                       <span className="lesson-num">{st.sequence_order}</span>
                       <span className="lesson-title">{displayTitle}</span>
@@ -1160,12 +1389,13 @@ function App() {
                 })}
               </div>
             </div>
+            )}
 
             {/* BOTÓN EXAMEN DE CERTIFICACIÓN A1 */}
             {data && realProgress && (() => {
               const allLessonsDone = subtopicsList.every(st => {
-                if (st.sequence_order === 10) return true;
-                return st.sequence_order < 10 && (realProgress.skill_stats && Object.keys(realProgress.skill_stats).length > 0);
+                if (st.sequence_order === lastLessonOrder) return true;
+                return st.sequence_order < lastLessonOrder && (realProgress.skill_stats && Object.keys(realProgress.skill_stats).length > 0);
               });
               const completion100 = (realProgress.overall_completion || 0) >= 100;
               const avg70 = (realProgress.overall_average || 0) >= 70;
@@ -1224,10 +1454,46 @@ function App() {
 
             {data ? (
               <>
-                <section className="panel-3d p-6">
+                <section key={currentSubtopicId} ref={lessonContentRef} className="panel-3d p-6 scroll-mt-20 lesson-content-enter">
                   <h2 className="text-xl font-bold text-white mb-2">{adaptText(data.title)}</h2>
                   <p className="text-slate-400 italic">"{data.mcer_goal || data.mcer_descriptor}"</p>
                 </section>
+
+                {showScrollHint && !showLessonGrid && (
+                  <div ref={scrollHintRef} className="scroll-hint-card">
+                    <button
+                      onClick={() => {
+                        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                        skillsRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+                      }}
+                      className="scroll-hint-main"
+                    >
+                      <div className="scroll-hint-arrow-wrap">
+                        <svg className="scroll-hint-arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 5v14M5 12l7 7 7-7" />
+                        </svg>
+                      </div>
+                      <span className="scroll-hint-text">El contenido de ejercicios está abajo — desliza para verlo</span>
+                    </button>
+                    <label className="scroll-hint-dismiss">
+                      <input
+                        type="checkbox"
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            localStorage.setItem('teclingo_hide_scroll_hint', 'true');
+                            if (scrollHintRef.current) {
+                              scrollHintRef.current.classList.add('scroll-hint-fadeout');
+                              setTimeout(() => setShowScrollHint(false), 300);
+                            } else {
+                              setShowScrollHint(false);
+                            }
+                          }
+                        }}
+                      />
+                      <span>No volver a mostrar</span>
+                    </label>
+                  </div>
+                )}
 
                 {data.theory && <section className="panel-3d p-6"><h3 className="text-xl font-bold text-blue-400 mb-3">📖 Teoría</h3><p className="text-slate-300 leading-relaxed">{adaptText(data.theory)}</p></section>}
 
@@ -1254,7 +1520,7 @@ function App() {
                     </div>
                   </section>
                 ) : (
-                <section className="panel-3d panel-header-purple p-6">
+                <section ref={skillsRef} className="panel-3d panel-header-purple p-6 scroll-mt-20">
                   <h3 className="text-xl font-bold text-purple-400 mb-4">Práctica por Habilidad</h3>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex flex-wrap gap-2 border-b border-slate-700 pb-3">
@@ -1301,76 +1567,111 @@ function App() {
                       </div>
                     ) : (
                     <div className="space-y-6">
-                      <div className="space-y-2">
-                        {grammarExercises.map((ex, idx) => {
-                          const key = `g-${ex.id || idx}`;
-                          const fb: BatchResult | undefined = batchFeedbacks['grammar']?.results[idx];
-                          const currentAttempts = attempts['grammar'] || 0;
-                          const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
+                      <div className="space-y-4">
+                        {(() => {
+                          const totalQ = grammarExercises.length;
+                          const gIdx = currentQuestionIdx['grammar'] || 0;
+                          const gDone = gIdx >= totalQ;
+                          if (gDone) {
+                            const score = calculateSkillScore('grammar');
+                            const remaining = skillLabels.filter(s => s.key !== 'grammar' && !isSkillQuestionsDone(s.key) && !isSkillPerfect(s.key));
+                            const allDone = skillLabels.every(s => isSkillQuestionsDone(s.key) || isSkillPerfect(s.key));
+                            return (
+                              <div className="flex flex-col items-center py-10 slide-up-anim">
+                                <div className="text-center p-8 bg-gradient-to-b from-purple-900/40 to-violet-900/30 border-2 border-purple-500 rounded-2xl shadow-2xl max-w-md w-full celebration-glow">
+                                  <p className="text-6xl mb-3">🎉</p>
+                                  <h3 className="text-xl font-bold text-purple-400 mb-1">¡Grammar Completado!</h3>
+                                  <p className="text-purple-300 text-lg mb-1">Puntaje: {score}/100</p>
+                                  <p className="text-slate-400 text-sm mb-5">Has completado todas las preguntas de gramática.</p>
+                                  {allDone ? (
+                                    <div className="space-y-3 slide-up-anim-delay-2">
+                                      <p className="text-amber-400 font-bold text-sm">🏆 ¡Todas las habilidades completadas!</p>
+                                      <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Ir a la siguiente lección</button>
+                                      <button onClick={() => setActiveTab('progress')} className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">📊 Ver mi progreso</button>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-3 slide-up-anim-delay-1">
+                                      <p className="text-slate-300 text-sm">Continúa con la siguiente habilidad:</p>
+                                      <div className="flex flex-wrap gap-2 justify-center">
+                                        {remaining.length > 0 ? remaining.map(s => (
+                                          <button key={s.key} onClick={() => setSkillTab(s.key)} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-all text-sm">{s.icon} {s.label}</button>
+                                        )) : (
+                                          <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Siguiente lección</button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <button onClick={() => loadAlternateExercises('grammar')} disabled={loadingAlternate === 'grammar' || !!completedSkills['grammar']} className={`repasar-btn-3d mt-3 ${completedSkills['grammar'] ? 'repasar-completed' : ''}`}>
+                                    {completedSkills['grammar'] ? '✅ Ejercicio completado' : (loadingAlternate === 'grammar' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          const ex = grammarExercises[gIdx];
+                          const key = `g-${ex.id || gIdx}`;
+                          const fb: BatchResult | undefined = batchFeedbacks['grammar']?.results[gIdx];
+                          const qKey = `grammar-${gIdx}`;
+                          const qAttempts = questionAttemptCount[qKey] || 0;
+                          const canInteract = qAttempts < 2 && !(fb?.is_correct);
                           const isUnscramble = ex.type === 'unscramble' && Array.isArray(ex.words) && ex.words.length > 0;
                           const hasOptions = ex.options && ex.options.length > 0;
-                          const open = isExerciseOpen(key);
-                          const statusIcon = getExerciseIcon(fb, isLocked);
-                          const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : '';
                           return (
-                            <div key={idx} className={`${borderClass}`}>
-                              <div className={`accordion-header ${borderClass}`} onClick={() => toggleExercise(key)}>
-                                <div className="accordion-header-left">
-                                  <span className="accordion-num">{idx + 1}.</span>
-                                  <span className="accordion-preview">{ex.question || 'Ejercicio de audio'}</span>
-                                </div>
-                                <span className="accordion-status">{statusIcon}</span>
-                                <span className={`accordion-chevron ${open ? 'open' : ''}`}>▼</span>
+                            <div>
+                              <div className="flex items-center gap-3 mb-5">
+                                <span className="text-sm text-slate-400 font-medium whitespace-nowrap">Pregunta {gIdx + 1} de {totalQ}</span>
+                                <div className="flex-1 bg-slate-700 rounded-full h-2.5"><div className="bg-purple-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${(gIdx / totalQ) * 100}%` }} /></div>
+                                <span className="text-sm text-purple-400 font-bold">{batchFeedbacks['grammar']?.results?.filter((r: any) => r?.is_correct).length || 0}/{totalQ}</span>
                               </div>
-                              <div className={`accordion-body ${open ? 'open' : ''}`}>
-                                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                                  {isUnscramble ? (
-                                    <UnscrambleExercise exercise={ex} index={idx} userAnswer={selectedAnswers[key] || ''} onAnswerChange={(answer: string) => !isLocked && handleAnswerSelect(key, answer)} feedback={fb} isLocked={isLocked} />
-                                  ) : hasOptions ? (
-                                    <div className="flex gap-2 flex-wrap">
-                                      {ex.options!.map((opt, i) => (
-                                        <button key={i} onClick={() => !isLocked && handleAnswerSelect(key, opt)} disabled={isLocked}
-                                          className={`exercise-opt-3d ${isLocked ? 'exercise-opt-locked' : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
+                              <div className={`bg-slate-900/50 p-6 rounded-xl border-2 transition-all duration-300 ${fb?.is_correct ? 'border-green-500 bg-green-900/10' : fb && !fb.is_correct ? 'border-red-500/50 bg-red-900/10' : 'border-slate-700'}`}>
+                                <p className="text-white font-semibold text-lg mb-5"><span className="text-purple-400 mr-2">{gIdx + 1}.</span>{ex.question || 'Ejercicio'}</p>
+                                {isUnscramble ? (
+                                  <UnscrambleExercise exercise={ex} index={gIdx} userAnswer={selectedAnswers[key] || ''} onAnswerChange={(answer: string) => canInteract && handleAnswerSelect(key, answer)} onComplete={() => canInteract && !fb && autoEvaluateQuestion('grammar', gIdx, selectedAnswers[key] || '')} feedback={fb} isLocked={!canInteract} />
+                                ) : hasOptions ? (
+                                  <div className="flex gap-3 flex-wrap">
+                                    {ex.options!.map((opt: string, i: number) => (
+                                      <button key={i} onClick={() => { if (canInteract) { handleAnswerSelect(key, opt); speak(opt); setTimeout(() => autoEvaluateQuestion('grammar', gIdx, opt), 300); } }} disabled={!canInteract}
+                                        className={`exercise-opt-3d transition-all ${!canInteract ? (selectedAnswers[key] === opt ? (fb?.is_correct ? 'exercise-opt-selected !border-green-500 !bg-green-900/30' : 'exercise-opt-selected !border-red-500 !bg-red-900/30') : 'exercise-opt-locked') : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
+                                      >{opt}</button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <div className="flex gap-3 flex-wrap">
+                                      {getGeneratedOptions(key, ex.answer, grammarExercises.map((e: any) => e.answer).filter(Boolean)).map((opt: string, i: number) => (
+                                        <button key={i} onClick={() => { if (canInteract) { handleAnswerSelect(key, opt); speak(opt); setTimeout(() => autoEvaluateQuestion('grammar', gIdx, opt), 300); } }} disabled={!canInteract}
+                                          className={`exercise-opt-3d transition-all ${!canInteract ? (selectedAnswers[key] === opt ? (fb?.is_correct ? 'exercise-opt-selected !border-green-500 !bg-green-900/30' : 'exercise-opt-selected !border-red-500 !bg-red-900/30') : 'exercise-opt-locked') : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
                                         >{opt}</button>
                                       ))}
                                     </div>
-                                  ) : (
-                                    <textarea value={selectedAnswers[key] || ''} onChange={(e) => !isLocked && handleAnswerSelect(key, e.target.value)} disabled={isLocked} placeholder="Escribe tu respuesta aquí..." className={`w-full p-3 rounded-lg border focus:outline-none transition-all ${isLocked ? 'bg-slate-800 text-slate-400 border-slate-700 cursor-not-allowed' : 'bg-slate-700 text-white border-slate-600 focus:border-purple-500'}`} rows={2} />
-                                  )}
-                                  {fb && (
-                                    <div className="mt-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                                      <span className={`font-bold ${getScoreColor(fb.score)}`}>{fb.is_correct ? '✅ Correcto' : (currentAttempts === 1 ? '💡 Incorrecto, ¡intenta corregirlo!' : '💡 Necesita mejora')} - Puntaje: {fb.score}/100</span>
-                                      <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
-                                      {!fb.is_correct && fb.rule_hint && (
-                                        <button onClick={() => { setTimeout(() => { setActiveTab('library'); }, 100); }} className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer">
-                                          📖 Ver regla gramatical: {fb.rule_hint}
-                                        </button>
-                                      )}
-                                      <p className="text-slate-400 text-xs italic mt-1">📚 Fundamento: {fb.pedagogical_reason}</p>
-                                      {currentAttempts === 1 && !fb.is_correct && <p className="text-yellow-400 text-xs mt-2 font-semibold animate-pulse">🔄 Tienes una oportunidad más para corregir esta respuesta.</p>}
+                                  </div>
+                                )}
+                                {evaluatingSkill === 'grammar' && <div className="mt-4 flex items-center gap-2 text-purple-400"><span className="animate-spin text-lg">⏳</span><span className="text-sm font-semibold">Evaluando...</span></div>}
+                                {fb && (
+                                  <div className={`mt-4 p-4 rounded-lg border transition-all slide-up-anim ${fb.is_correct ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'}`}>
+                                    <span className={`font-bold text-lg ${fb.is_correct ? 'text-green-400' : 'text-yellow-400'}`}>{fb.is_correct ? '✅ ¡Correcto!' : '💡 ¡Casi!'}</span>
+                                    <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
+                                    {!fb.is_correct && fb.rule_hint && <button onClick={() => setTimeout(() => setActiveTab('library'), 100)} className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline">📖 Ver regla: {fb.rule_hint}</button>}
+                                    {!fb.is_correct && qAttempts < 2 && <p className="text-yellow-400 text-xs mt-2 font-semibold animate-pulse">🔄 Selecciona otra opción para tu segundo intento.</p>}
+                                    {!fb.is_correct && qAttempts >= 2 && <p className="text-slate-400 text-xs mt-2">Avanzando a la siguiente pregunta...</p>}
+                                  </div>
+                                )}
+                                {fb && fb.is_correct && (
+                                  <div className="mt-4 p-4 bg-slate-900/80 border border-cyan-500/30 rounded-xl flex items-center justify-between animate-fadeIn">
+                                    <div>
+                                      <span className="text-cyan-400 font-bold text-sm block">¡Correcto! Has ejercitado tu cerebro</span>
+                                      <p className="text-xs text-slate-300">Sigue así para completar tu lección.</p>
                                     </div>
-                                  )}
-                                </div>
+                                    <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                                      <img src="/assets/images/cerebro-gym.webp" alt="Cerebro Tec-English AI" className="w-full h-auto object-contain animate-bounce drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]" />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
-                        })}
+                        })()}
                       </div>
-                      {(attempts['grammar'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('grammar', grammarExercises)} disabled={evaluatingSkill === 'grammar'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
-                          {evaluatingSkill === 'grammar' ? '🤖 Analizando...' : (attempts['grammar'] === 1 ? '🔄 Evaluar correcciones (Último intento)' : '🤖 Evaluar todo el bloque de Grammar con IA')}
-                        </button>
-                      ) : (
-                        <div className="text-center p-4 bg-green-900/20 border border-green-700 rounded-lg">
-                          <p className="text-green-400 font-bold text-lg">✅ Evaluación de Grammar finalizada</p>
-                          {isAlternateMode['grammar'] && (
-                            <button onClick={() => exitAlternateMode('grammar')} className="mt-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-semibold">← Volver a ejercicios originales</button>
-                          )}
-                          <button onClick={() => loadAlternateExercises('grammar')} disabled={loadingAlternate === 'grammar' || !!completedSkills['grammar']} className={`repasar-btn-3d mt-3 ${completedSkills['grammar'] ? 'repasar-completed' : ''}`}>
-                            {completedSkills['grammar'] ? '✅ Ejercicio completado' : (loadingAlternate === 'grammar' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
-                          </button>
-                        </div>
-                      )}
                     </div>
                     )
                   )}
@@ -1424,49 +1725,99 @@ function App() {
                           </div>
                         )}
                       </div>
-                      <div className="space-y-2">
-                        {vocabularyExercises.map((ex, idx) => {
-                          const key = `v-${ex.id || idx}`;
-                          const fb: BatchResult | undefined = batchFeedbacks['vocabulary']?.results[idx];
-                          const currentAttempts = attempts['vocabulary'] || 0;
-                          const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                          const open = isExerciseOpen(key);
-                          const statusIcon = getExerciseIcon(fb, isLocked);
-                          const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : '';
-                          return (
-                            <div key={idx} className={borderClass}>
-                              <div className={`accordion-header ${borderClass}`} onClick={() => toggleExercise(key)}>
-                                <div className="accordion-header-left">
-                                  <span className="accordion-num">{idx + 1}.</span>
-                                  <span className="accordion-preview">{ex.question}</span>
+                      <div className="space-y-4">
+                        {(() => {
+                          const totalQ = vocabularyExercises.length;
+                          const vIdx = currentQuestionIdx['vocabulary'] || 0;
+                          const vDone = vIdx >= totalQ;
+                          if (vDone) {
+                            const score = calculateSkillScore('vocabulary');
+                            const remaining = skillLabels.filter(s => s.key !== 'vocabulary' && !isSkillQuestionsDone(s.key) && !isSkillPerfect(s.key));
+                            const allDone = skillLabels.every(s => isSkillQuestionsDone(s.key) || isSkillPerfect(s.key));
+                            return (
+                              <div className="flex flex-col items-center py-10 slide-up-anim">
+                                <div className="text-center p-8 bg-gradient-to-b from-blue-900/40 to-indigo-900/30 border-2 border-blue-500 rounded-2xl shadow-2xl max-w-md w-full celebration-glow">
+                                  <p className="text-6xl mb-3">🎉</p>
+                                  <h3 className="text-xl font-bold text-blue-400 mb-1">¡Vocabulary Completado!</h3>
+                                  <p className="text-blue-300 text-lg mb-1">Puntaje: {score}/100</p>
+                                  <p className="text-slate-400 text-sm mb-5">Has completado todas las preguntas de vocabulario.</p>
+                                  {allDone ? (
+                                    <div className="space-y-3 slide-up-anim-delay-2">
+                                      <p className="text-amber-400 font-bold text-sm">🏆 ¡Todas las habilidades completadas!</p>
+                                      <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Ir a la siguiente lección</button>
+                                      <button onClick={() => setActiveTab('progress')} className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">📊 Ver mi progreso</button>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-3 slide-up-anim-delay-1">
+                                      <p className="text-slate-300 text-sm">Continúa con la siguiente habilidad:</p>
+                                      <div className="flex flex-wrap gap-2 justify-center">
+                                        {remaining.length > 0 ? remaining.map(s => (
+                                          <button key={s.key} onClick={() => setSkillTab(s.key)} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-all text-sm">{s.icon} {s.label}</button>
+                                        )) : (
+                                          <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Siguiente lección</button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <button onClick={() => loadAlternateExercises('vocabulary')} disabled={loadingAlternate === 'vocabulary' || !!completedSkills['vocabulary']} className={`repasar-btn-3d mt-3 ${completedSkills['vocabulary'] ? 'repasar-completed' : ''}`}>
+                                    {completedSkills['vocabulary'] ? '✅ Ejercicio completado' : (loadingAlternate === 'vocabulary' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
+                                  </button>
                                 </div>
-                                <span className="accordion-status">{statusIcon}</span>
-                                <span className={`accordion-chevron ${open ? 'open' : ''}`}>▼</span>
                               </div>
-                              <div className={`accordion-body ${open ? 'open' : ''}`}>
-                                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                                  <UnscrambleExercise exercise={ex} index={idx} userAnswer={selectedAnswers[key] || ''} onAnswerChange={(answer: string) => !isLocked && handleAnswerSelect(key, answer)} feedback={fb} isLocked={isLocked} />
-                                </div>
+                            );
+                          }
+                          const ex = vocabularyExercises[vIdx];
+                          const key = `v-${ex.id || vIdx}`;
+                          const fb: BatchResult | undefined = batchFeedbacks['vocabulary']?.results[vIdx];
+                          const qKey = `vocabulary-${vIdx}`;
+                          const qAttempts = questionAttemptCount[qKey] || 0;
+                          const canInteract = qAttempts < 2 && !(fb?.is_correct);
+                          const options = ex.options || (ex.words && ex.words.length > 0 ? ex.words : generateOptionsFromAnswer(ex.answer, data?.vocabulary || []));
+                          return (
+                            <div>
+                              <div className="flex items-center gap-3 mb-5">
+                                <span className="text-sm text-slate-400 font-medium whitespace-nowrap">Pregunta {vIdx + 1} de {totalQ}</span>
+                                <div className="flex-1 bg-slate-700 rounded-full h-2.5"><div className="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${(vIdx / totalQ) * 100}%` }} /></div>
+                                <span className="text-sm text-blue-400 font-bold">{batchFeedbacks['vocabulary']?.results?.filter((r: any) => r?.is_correct).length || 0}/{totalQ}</span>
+                              </div>
+                              <div className={`bg-slate-900/50 p-6 rounded-xl border-2 transition-all duration-300 ${fb?.is_correct ? 'border-green-500 bg-green-900/10' : fb && !fb.is_correct ? 'border-red-500/50 bg-red-900/10' : 'border-slate-700'}`}>
+                                <p className="text-white font-semibold text-lg mb-5"><span className="text-blue-400 mr-2">{vIdx + 1}.</span>{ex.question}</p>
+                                {options && options.length > 0 ? (
+                                  <div className="flex gap-3 flex-wrap">
+                                    {options.map((opt: string, i: number) => (
+                                      <button key={i} onClick={() => { if (canInteract) { handleAnswerSelect(key, opt); speak(opt); setTimeout(() => autoEvaluateQuestion('vocabulary', vIdx, opt), 300); } }} disabled={!canInteract}
+                                        className={`exercise-opt-3d transition-all ${!canInteract ? (selectedAnswers[key] === opt ? (fb?.is_correct ? 'exercise-opt-selected !border-green-500 !bg-green-900/30' : 'exercise-opt-selected !border-red-500 !bg-red-900/30') : 'exercise-opt-locked') : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
+                                      >{opt}</button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <UnscrambleExercise exercise={ex} index={vIdx} userAnswer={selectedAnswers[key] || ''} onAnswerChange={(answer: string) => canInteract && handleAnswerSelect(key, answer)} onComplete={() => canInteract && !fb && autoEvaluateQuestion('vocabulary', vIdx, selectedAnswers[key] || '')} feedback={fb} isLocked={!canInteract} />
+                                )}
+                                {evaluatingSkill === 'vocabulary' && <div className="mt-4 flex items-center gap-2 text-purple-400"><span className="animate-spin text-lg">⏳</span><span className="text-sm font-semibold">Evaluando...</span></div>}
+                                {fb && (
+                                  <div className={`mt-4 p-4 rounded-lg border transition-all slide-up-anim ${fb.is_correct ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'}`}>
+                                    <span className={`font-bold text-lg ${fb.is_correct ? 'text-green-400' : 'text-yellow-400'}`}>{fb.is_correct ? '✅ ¡Correcto!' : '💡 ¡Casi!'}</span>
+                                    <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
+                                    {!fb.is_correct && qAttempts < 2 && <p className="text-yellow-400 text-xs mt-2 font-semibold animate-pulse">🔄 Selecciona otra opción para tu segundo intento.</p>}
+                                    {!fb.is_correct && qAttempts >= 2 && <p className="text-slate-400 text-xs mt-2">Avanzando a la siguiente pregunta...</p>}
+                                  </div>
+                                )}
+                                {fb && fb.is_correct && (
+                                  <div className="mt-4 p-4 bg-slate-900/80 border border-cyan-500/30 rounded-xl flex items-center justify-between animate-fadeIn">
+                                    <div>
+                                      <span className="text-cyan-400 font-bold text-sm block">¡Correcto! Has ejercitado tu cerebro</span>
+                                      <p className="text-xs text-slate-300">Sigue así para completar tu lección.</p>
+                                    </div>
+                                    <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                                      <img src="/assets/images/cerebro-gym.webp" alt="Cerebro Tec-English AI" className="w-full h-auto object-contain animate-bounce drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]" />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
-                        })}
+                        })()}
                       </div>
-                      {(attempts['vocabulary'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('vocabulary', vocabularyExercises)} disabled={evaluatingSkill === 'vocabulary'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
-                          {evaluatingSkill === 'vocabulary' ? '🤖 Analizando...' : (attempts['vocabulary'] === 1 ? '🔄 Evaluar correcciones (Último intento)' : '🤖 Evaluar todo el bloque de Vocabulary con IA')}
-                        </button>
-                      ) : (
-                        <div className="text-center p-4 bg-green-900/20 border border-green-700 rounded-lg">
-                          <p className="text-green-400 font-bold text-lg">✅ Evaluación de Vocabulary finalizada</p>
-                          {isAlternateMode['vocabulary'] && (
-                            <button onClick={() => exitAlternateMode('vocabulary')} className="mt-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-semibold">← Volver a ejercicios originales</button>
-                          )}
-                          <button onClick={() => loadAlternateExercises('vocabulary')} disabled={loadingAlternate === 'vocabulary' || !!completedSkills['vocabulary']} className={`repasar-btn-3d mt-3 ${completedSkills['vocabulary'] ? 'repasar-completed' : ''}`}>
-                            {completedSkills['vocabulary'] ? '✅ Ejercicio completado' : (loadingAlternate === 'vocabulary' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
-                          </button>
-                        </div>
-                      )}
                     </div>
                     )
                   )}
@@ -1501,66 +1852,96 @@ function App() {
                           {audioState.isPlaying && audioState.text === readingExercises.text ? '⏸️ Pausar' : '🔊 Escuchar texto'}
                         </button>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         <h4 className="text-green-400 font-semibold">Preguntas de Comprensión</h4>
-                        {readingExercises.questions.map((q, idx) => {
-                          const key = `r-${q.id || idx}`;
-                          const fb: BatchResult | undefined = batchFeedbacks['reading']?.results[idx];
-                          const currentAttempts = attempts['reading'] || 0;
-                          const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                          const open = isExerciseOpen(key);
-                          const statusIcon = getExerciseIcon(fb, isLocked);
-                          const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : '';
-                          return (
-                            <div key={idx} className={borderClass}>
-                              <div className={`accordion-header ${borderClass}`} onClick={() => toggleExercise(key)}>
-                                <div className="accordion-header-left">
-                                  <span className="accordion-num">{idx + 1}.</span>
-                                  <span className="accordion-preview">{q.question}</span>
-                                </div>
-                                <span className="accordion-status">{statusIcon}</span>
-                                <span className={`accordion-chevron ${open ? 'open' : ''}`}>▼</span>
-                              </div>
-                              <div className={`accordion-body ${open ? 'open' : ''}`}>
-                                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                                  <div className="flex gap-2 flex-wrap">
-                                    {q.options.map((opt, i) => (
-                                      <button key={i} onClick={() => !isLocked && handleAnswerSelect(key, opt)} disabled={isLocked}
-                                        className={`exercise-opt-3d ${isLocked ? 'exercise-opt-locked' : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
-                                      >{opt}</button>
-                                    ))}
-                                  </div>
-                                  {fb && (
-                                    <div className="mt-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                                      <span className={`font-bold ${getScoreColor(fb.score)}`}>{fb.is_correct ? '✅ Correcto' : '💡 Necesita mejora'} - Puntaje: {fb.score}/100</span>
-                                      <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
-                                      <p className="text-slate-400 text-xs italic mt-1">📚 Fundamento: {fb.pedagogical_reason}</p>
+                        {(() => {
+                          const questions = readingExercises.questions;
+                          const rIdx = currentQuestionIdx['reading'] || 0;
+                          const totalQ = questions.length;
+                          const rDone = rIdx >= totalQ;
+                          if (rDone) {
+                            const score = calculateSkillScore('reading');
+                            const remaining = skillLabels.filter(s => s.key !== 'reading' && !isSkillQuestionsDone(s.key) && !isSkillPerfect(s.key));
+                            const allDone = skillLabels.every(s => isSkillQuestionsDone(s.key) || isSkillPerfect(s.key));
+                            return (
+                              <div className="flex flex-col items-center py-10 slide-up-anim">
+                                <div className="text-center p-8 bg-gradient-to-b from-green-900/40 to-emerald-900/30 border-2 border-green-500 rounded-2xl shadow-2xl max-w-md w-full celebration-glow">
+                                  <p className="text-6xl mb-3">🎉</p>
+                                  <h3 className="text-xl font-bold text-green-400 mb-1">¡Reading Completado!</h3>
+                                  <p className="text-green-300 text-lg mb-1">Puntaje: {score}/100</p>
+                                  <p className="text-slate-400 text-sm mb-5">Has completado todas las preguntas de comprensión.</p>
+                                  {allDone ? (
+                                    <div className="space-y-3 slide-up-anim-delay-2">
+                                      <p className="text-amber-400 font-bold text-sm">🏆 ¡Todas las habilidades completadas!</p>
+                                      <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Ir a la siguiente lección</button>
+                                      <button onClick={() => setActiveTab('progress')} className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">📊 Ver mi progreso</button>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-3 slide-up-anim-delay-1">
+                                      <p className="text-slate-300 text-sm">Continúa con la siguiente habilidad:</p>
+                                      <div className="flex flex-wrap gap-2 justify-center">
+                                        {remaining.length > 0 ? remaining.map(s => (
+                                          <button key={s.key} onClick={() => setSkillTab(s.key)} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-all text-sm">{s.icon} {s.label}</button>
+                                        )) : (
+                                          <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Siguiente lección</button>
+                                        )}
+                                      </div>
                                     </div>
                                   )}
+                                  <button onClick={() => loadAlternateExercises('reading')} disabled={loadingAlternate === 'reading' || !!completedSkills['reading']} className={`repasar-btn-3d mt-3 ${completedSkills['reading'] ? 'repasar-completed' : ''}`}>
+                                    {completedSkills['reading'] ? '✅ Ejercicio completado' : (loadingAlternate === 'reading' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
+                                  </button>
                                 </div>
+                              </div>
+                            );
+                          }
+                          const q = questions[rIdx];
+                          const key = `r-${q.id || rIdx}`;
+                          const fb: BatchResult | undefined = batchFeedbacks['reading']?.results[rIdx];
+                          const qKey = `reading-${rIdx}`;
+                          const qAttempts = questionAttemptCount[qKey] || 0;
+                          const canInteract = qAttempts < 2 && !(fb?.is_correct);
+                          return (
+                            <div>
+                              <div className="flex items-center gap-3 mb-5">
+                                <span className="text-sm text-slate-400 font-medium whitespace-nowrap">Pregunta {rIdx + 1} de {totalQ}</span>
+                                <div className="flex-1 bg-slate-700 rounded-full h-2.5"><div className="bg-green-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${(rIdx / totalQ) * 100}%` }} /></div>
+                                <span className="text-sm text-green-400 font-bold">{batchFeedbacks['reading']?.results?.filter((r: any) => r?.is_correct).length || 0}/{totalQ}</span>
+                              </div>
+                              <div className={`bg-slate-900/50 p-6 rounded-xl border-2 transition-all duration-300 ${fb?.is_correct ? 'border-green-500 bg-green-900/10' : fb && !fb.is_correct ? 'border-red-500/50 bg-red-900/10' : 'border-slate-700'}`}>
+                                <p className="text-white font-semibold text-lg mb-5"><span className="text-green-400 mr-2">{rIdx + 1}.</span>{q.question}</p>
+                                <div className="flex gap-3 flex-wrap">
+                                  {q.options.map((opt, i) => (
+                                    <button key={i} onClick={() => { if (canInteract) { handleAnswerSelect(key, opt); speak(opt); setTimeout(() => autoEvaluateQuestion('reading', rIdx, opt), 300); } }} disabled={!canInteract}
+                                      className={`exercise-opt-3d transition-all ${!canInteract ? (selectedAnswers[key] === opt ? (fb?.is_correct ? 'exercise-opt-selected !border-green-500 !bg-green-900/30' : 'exercise-opt-selected !border-red-500 !bg-red-900/30') : 'exercise-opt-locked') : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
+                                    >{opt}</button>
+                                  ))}
+                                </div>
+                                {evaluatingSkill === 'reading' && <div className="mt-4 flex items-center gap-2 text-purple-400"><span className="animate-spin text-lg">⏳</span><span className="text-sm font-semibold">Evaluando...</span></div>}
+                                {fb && (
+                                  <div className={`mt-4 p-4 rounded-lg border transition-all slide-up-anim ${fb.is_correct ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'}`}>
+                                    <span className={`font-bold text-lg ${fb.is_correct ? 'text-green-400' : 'text-yellow-400'}`}>{fb.is_correct ? '✅ ¡Correcto!' : '💡 ¡Casi!'}</span>
+                                    <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
+                                    {!fb.is_correct && qAttempts < 2 && <p className="text-yellow-400 text-xs mt-2 font-semibold animate-pulse">🔄 Selecciona otra opción para tu segundo intento.</p>}
+                                    {!fb.is_correct && qAttempts >= 2 && <p className="text-slate-400 text-xs mt-2">Avanzando a la siguiente pregunta...</p>}
+                                  </div>
+                                )}
+                                {fb && fb.is_correct && (
+                                  <div className="mt-4 p-4 bg-slate-900/80 border border-cyan-500/30 rounded-xl flex items-center justify-between animate-fadeIn">
+                                    <div>
+                                      <span className="text-cyan-400 font-bold text-sm block">¡Correcto! Has ejercitado tu cerebro</span>
+                                      <p className="text-xs text-slate-300">Sigue así para completar tu lección.</p>
+                                    </div>
+                                    <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                                      <img src="/assets/images/cerebro-gym.webp" alt="Cerebro Tec-English AI" className="w-full h-auto object-contain animate-bounce drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]" />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
-                        })}
+                        })()}
                       </div>
-                      {(attempts['reading'] || 0) < 2 ? (
-                        <button onClick={() => {
-                          const qs = readingExercises.questions;
-                          evaluateBatch('reading', qs.map((q: any) => ({ question: q.question, answer: q.answer, id: q.id })));
-                        }} disabled={evaluatingSkill === 'reading'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
-                          {evaluatingSkill === 'reading' ? '🤖 Analizando...' : '🤖 Evaluar comprensión lectora con IA'}
-                        </button>
-                      ) : (
-                        <div className="text-center p-4 bg-green-900/20 border border-green-700 rounded-lg">
-                          <p className="text-green-400 font-bold text-lg">✅ Evaluación de Reading finalizada</p>
-                          {isAlternateMode['reading'] && (
-                            <button onClick={() => exitAlternateMode('reading')} className="mt-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-semibold">← Volver a ejercicios originales</button>
-                          )}
-                          <button onClick={() => loadAlternateExercises('reading')} disabled={loadingAlternate === 'reading' || !!completedSkills['reading']} className={`repasar-btn-3d mt-3 ${completedSkills['reading'] ? 'repasar-completed' : ''}`}>
-                            {completedSkills['reading'] ? '✅ Ejercicio completado' : (loadingAlternate === 'reading' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )
                   )}
@@ -1601,50 +1982,94 @@ function App() {
                       </div>
                       <div className="space-y-4">
                         <h4 className="text-purple-400 font-semibold">Preguntas de Listening</h4>
-                        {listeningExercises.questions.map((q, idx) => {
-                          const key = `l-${q.id || idx}`;
-                          const fb: BatchResult | undefined = batchFeedbacks['listening']?.results[idx];
-                          const currentAttempts = attempts['listening'] || 0;
-                          const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                          return (
-                            <div key={idx} className={`bg-slate-900/50 p-4 rounded-lg border ${fb ? getBorderColor(fb.score) : 'border-slate-700'}`}>
-                              <p className="text-slate-200 mb-3 font-medium">{idx + 1}. {q.question}</p>
-                              <div className="flex gap-2 flex-wrap">
-                                {q.options.map((opt, i) => (
-                                  <button key={i} onClick={() => !isLocked && handleAnswerSelect(key, opt)} disabled={isLocked}
-                                    className={`exercise-opt-3d ${isLocked ? 'exercise-opt-locked' : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
-                                  >{opt}</button>
-                                ))}
-                              </div>
-                              {fb && (
-                                <div className="mt-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                                  <span className={`font-bold ${getScoreColor(fb.score)}`}>{fb.is_correct ? '✅ Correcto' : '💡 Necesita mejora'} - Puntaje: {fb.score}/100</span>
-                                  <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
-                                  <p className="text-slate-400 text-xs italic mt-1">📚 Fundamento: {fb.pedagogical_reason}</p>
+                        {(() => {
+                          const questions = listeningExercises.questions;
+                          const lIdx = currentQuestionIdx['listening'] || 0;
+                          const totalQ = questions.length;
+                          const lDone = lIdx >= totalQ;
+                          if (lDone) {
+                            const score = calculateSkillScore('listening');
+                            const remaining = skillLabels.filter(s => s.key !== 'listening' && !isSkillQuestionsDone(s.key) && !isSkillPerfect(s.key));
+                            const allDone = skillLabels.every(s => isSkillQuestionsDone(s.key) || isSkillPerfect(s.key));
+                            return (
+                              <div className="flex flex-col items-center py-10 slide-up-anim">
+                                <div className="text-center p-8 bg-gradient-to-b from-purple-900/40 to-indigo-900/30 border-2 border-purple-500 rounded-2xl shadow-2xl max-w-md w-full celebration-glow">
+                                  <p className="text-6xl mb-3">🎉</p>
+                                  <h3 className="text-xl font-bold text-purple-400 mb-1">¡Listening Completado!</h3>
+                                  <p className="text-purple-300 text-lg mb-1">Puntaje: {score}/100</p>
+                                  <p className="text-slate-400 text-sm mb-5">Has completado todas las preguntas de listening.</p>
+                                  {allDone ? (
+                                    <div className="space-y-3 slide-up-anim-delay-2">
+                                      <p className="text-amber-400 font-bold text-sm">🏆 ¡Todas las habilidades completadas!</p>
+                                      <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Ir a la siguiente lección</button>
+                                      <button onClick={() => setActiveTab('progress')} className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">📊 Ver mi progreso</button>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-3 slide-up-anim-delay-1">
+                                      <p className="text-slate-300 text-sm">Continúa con la siguiente habilidad:</p>
+                                      <div className="flex flex-wrap gap-2 justify-center">
+                                        {remaining.length > 0 ? remaining.map(s => (
+                                          <button key={s.key} onClick={() => setSkillTab(s.key)} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-all text-sm">{s.icon} {s.label}</button>
+                                        )) : (
+                                          <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Siguiente lección</button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <button onClick={() => loadAlternateExercises('listening')} disabled={loadingAlternate === 'listening' || !!completedSkills['listening']} className={`repasar-btn-3d mt-3 ${completedSkills['listening'] ? 'repasar-completed' : ''}`}>
+                                    {completedSkills['listening'] ? '✅ Ejercicio completado' : (loadingAlternate === 'listening' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
+                                  </button>
                                 </div>
-                              )}
+                              </div>
+                            );
+                          }
+                          const q = questions[lIdx];
+                          const key = `l-${q.id || lIdx}`;
+                          const fb: BatchResult | undefined = batchFeedbacks['listening']?.results[lIdx];
+                          const qKey = `listening-${lIdx}`;
+                          const qAttempts = questionAttemptCount[qKey] || 0;
+                          const canInteract = qAttempts < 2 && !(fb?.is_correct);
+                          return (
+                            <div>
+                              <div className="flex items-center gap-3 mb-5">
+                                <span className="text-sm text-slate-400 font-medium whitespace-nowrap">Pregunta {lIdx + 1} de {totalQ}</span>
+                                <div className="flex-1 bg-slate-700 rounded-full h-2.5"><div className="bg-purple-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${(lIdx / totalQ) * 100}%` }} /></div>
+                                <span className="text-sm text-purple-400 font-bold">{batchFeedbacks['listening']?.results?.filter((r: any) => r?.is_correct).length || 0}/{totalQ}</span>
+                              </div>
+                              <div className={`bg-slate-900/50 p-6 rounded-xl border-2 transition-all duration-300 ${fb?.is_correct ? 'border-green-500 bg-green-900/10' : fb && !fb.is_correct ? 'border-red-500/50 bg-red-900/10' : 'border-slate-700'}`}>
+                                <p className="text-white font-semibold text-lg mb-5"><span className="text-purple-400 mr-2">{lIdx + 1}.</span>{q.question}</p>
+                                <div className="flex gap-3 flex-wrap">
+                                  {q.options.map((opt, i) => (
+                                    <button key={i} onClick={() => { if (canInteract) { handleAnswerSelect(key, opt); speak(opt); setTimeout(() => autoEvaluateQuestion('listening', lIdx, opt), 300); } }} disabled={!canInteract}
+                                      className={`exercise-opt-3d transition-all ${!canInteract ? (selectedAnswers[key] === opt ? (fb?.is_correct ? 'exercise-opt-selected !border-green-500 !bg-green-900/30' : 'exercise-opt-selected !border-red-500 !bg-red-900/30') : 'exercise-opt-locked') : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
+                                    >{opt}</button>
+                                  ))}
+                                </div>
+                                {evaluatingSkill === 'listening' && <div className="mt-4 flex items-center gap-2 text-purple-400"><span className="animate-spin text-lg">⏳</span><span className="text-sm font-semibold">Evaluando...</span></div>}
+                                {fb && (
+                                  <div className={`mt-4 p-4 rounded-lg border transition-all slide-up-anim ${fb.is_correct ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'}`}>
+                                    <span className={`font-bold text-lg ${fb.is_correct ? 'text-green-400' : 'text-yellow-400'}`}>{fb.is_correct ? '✅ ¡Correcto!' : '💡 ¡Casi!'}</span>
+                                    <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
+                                    {!fb.is_correct && qAttempts < 2 && <p className="text-yellow-400 text-xs mt-2 font-semibold animate-pulse">🔄 Selecciona otra opción para tu segundo intento.</p>}
+                                    {!fb.is_correct && qAttempts >= 2 && <p className="text-slate-400 text-xs mt-2">Avanzando a la siguiente pregunta...</p>}
+                                  </div>
+                                )}
+                                {fb && fb.is_correct && (
+                                  <div className="mt-4 p-4 bg-slate-900/80 border border-cyan-500/30 rounded-xl flex items-center justify-between animate-fadeIn">
+                                    <div>
+                                      <span className="text-cyan-400 font-bold text-sm block">¡Correcto! Has ejercitado tu cerebro</span>
+                                      <p className="text-xs text-slate-300">Sigue así para completar tu lección.</p>
+                                    </div>
+                                    <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                                      <img src="/assets/images/cerebro-gym.webp" alt="Cerebro Tec-English AI" className="w-full h-auto object-contain animate-bounce drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
-                        })}
+                        })()}
                       </div>
-                      {(attempts['listening'] || 0) < 2 ? (
-                        <button onClick={() => {
-                          const qs = listeningExercises.questions;
-                          evaluateBatch('listening', qs.map((q: any) => ({ question: q.question, answer: q.answer, id: q.id })));
-                        }} disabled={evaluatingSkill === 'listening'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
-                          {evaluatingSkill === 'listening' ? '🤖 Analizando...' : '🤖 Evaluar listening con IA'}
-                        </button>
-                      ) : (
-                        <div className="text-center p-4 bg-green-900/20 border border-green-700 rounded-lg">
-                          <p className="text-green-400 font-bold text-lg">✅ Evaluación de Listening finalizada</p>
-                          {isAlternateMode['listening'] && (
-                            <button onClick={() => exitAlternateMode('listening')} className="mt-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-semibold">← Volver a ejercicios originales</button>
-                          )}
-                          <button onClick={() => loadAlternateExercises('listening')} disabled={loadingAlternate === 'listening' || !!completedSkills['listening']} className={`repasar-btn-3d mt-3 ${completedSkills['listening'] ? 'repasar-completed' : ''}`}>
-                            {completedSkills['listening'] ? '✅ Ejercicio completado' : (loadingAlternate === 'listening' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )
                   )}
@@ -1676,46 +2101,120 @@ function App() {
                       </div>
                       <WritingRulesPanel />
                       <div className="space-y-4">
-                        {writingExercises.map((ex, idx) => {
-                          const key = `w-${ex.id || idx}`;
-                          const fb: BatchResult | undefined = batchFeedbacks['writing']?.results[idx];
-                          const currentAttempts = attempts['writing'] || 0;
-                          const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                          const isUnscramble = ex.type === 'unscramble' && Array.isArray(ex.words) && ex.words.length > 0;
-                          return (
-                            <div key={idx} className={`bg-slate-900/50 p-4 rounded-lg border ${fb ? getBorderColor(fb.score) : 'border-slate-700'}`}>
-                              <p className="text-slate-200 mb-3 font-medium">{idx + 1}. {ex.question || ex.prompt || 'Escribe la oración correcta:'}</p>
-                              {isUnscramble ? (
-                                <UnscrambleExercise exercise={ex} index={idx} userAnswer={selectedAnswers[key] || ''} onAnswerChange={(answer: string) => !isLocked && handleAnswerSelect(key, answer)} feedback={fb} isLocked={isLocked} />
-                              ) : (
-                                <input type="text" value={selectedAnswers[key] || ''} onChange={(e) => !isLocked && handleAnswerSelect(key, e.target.value)} disabled={isLocked} placeholder="Escribe tu respuesta aquí..." className={`w-full p-3 rounded-lg border transition-all ${isLocked ? 'bg-slate-800 text-slate-400 border-slate-700 cursor-not-allowed' : 'bg-slate-700 text-white border-slate-600 focus:border-indigo-500'}`} />
-                              )}
-                              {fb && (
-                                <div className="mt-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                                  <span className={`font-bold ${getScoreColor(fb.score)}`}>{fb.is_correct ? '✅ Correcto' : '💡 Necesita mejora'} - Puntaje: {fb.score}/100</span>
-                                  <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
-                                  <p className="text-slate-400 text-xs italic mt-1">📚 Fundamento: {fb.pedagogical_reason}</p>
+                        {(() => {
+                          const totalQ = writingExercises.length;
+                          const wIdx = currentQuestionIdx['writing'] || 0;
+                          const wDone = wIdx >= totalQ;
+                          if (wDone) {
+                            const score = calculateSkillScore('writing');
+                            const remaining = skillLabels.filter(s => s.key !== 'writing' && !isSkillQuestionsDone(s.key) && !isSkillPerfect(s.key));
+                            const allDone = skillLabels.every(s => isSkillQuestionsDone(s.key) || isSkillPerfect(s.key));
+                            return (
+                              <div className="flex flex-col items-center py-10 slide-up-anim">
+                                <div className="text-center p-8 bg-gradient-to-b from-indigo-900/40 to-blue-900/30 border-2 border-indigo-500 rounded-2xl shadow-2xl max-w-md w-full celebration-glow">
+                                  <p className="text-6xl mb-3">🎉</p>
+                                  <h3 className="text-xl font-bold text-indigo-400 mb-1">¡Writing Completado!</h3>
+                                  <p className="text-indigo-300 text-lg mb-1">Puntaje: {score}/100</p>
+                                  <p className="text-slate-400 text-sm mb-5">Has completado todos los ejercicios de escritura.</p>
+                                  {allDone ? (
+                                    <div className="space-y-3 slide-up-anim-delay-2">
+                                      <p className="text-amber-400 font-bold text-sm">🏆 ¡Todas las habilidades completadas!</p>
+                                      <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Ir a la siguiente lección</button>
+                                      <button onClick={() => setActiveTab('progress')} className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">📊 Ver mi progreso</button>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-3 slide-up-anim-delay-1">
+                                      <p className="text-slate-300 text-sm">Continúa con la siguiente habilidad:</p>
+                                      <div className="flex flex-wrap gap-2 justify-center">
+                                        {remaining.length > 0 ? remaining.map(s => (
+                                          <button key={s.key} onClick={() => setSkillTab(s.key)} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-all text-sm">{s.icon} {s.label}</button>
+                                        )) : (
+                                          <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Siguiente lección</button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <button onClick={() => loadAlternateExercises('writing')} disabled={loadingAlternate === 'writing' || !!completedSkills['writing']} className={`repasar-btn-3d mt-3 ${completedSkills['writing'] ? 'repasar-completed' : ''}`}>
+                                    {completedSkills['writing'] ? '✅ Ejercicio completado' : (loadingAlternate === 'writing' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
+                                  </button>
                                 </div>
-                              )}
+                              </div>
+                            );
+                          }
+                          const ex = writingExercises[wIdx];
+                          const key = `w-${ex.id || wIdx}`;
+                          const fb: BatchResult | undefined = batchFeedbacks['writing']?.results[wIdx];
+                          const qKey = `writing-${wIdx}`;
+                          const qAttempts = questionAttemptCount[qKey] || 0;
+                          const canInteract = qAttempts < 2 && !(fb?.is_correct);
+                          const isUnscramble = ex.type === 'unscramble' && Array.isArray(ex.words) && ex.words.length > 0;
+                          const hasOptions = ex.options && ex.options.length > 0;
+                          const isTranslation = !isUnscramble && !hasOptions && !!ex.answer;
+                          const opts = hasOptions ? ex.options : (isUnscramble ? ex.words : null);
+                          return (
+                            <div>
+                              <div className="flex items-center gap-3 mb-5">
+                                <span className="text-sm text-slate-400 font-medium whitespace-nowrap">Pregunta {wIdx + 1} de {totalQ}</span>
+                                <div className="flex-1 bg-slate-700 rounded-full h-2.5"><div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${(wIdx / totalQ) * 100}%` }} /></div>
+                                <span className="text-sm text-indigo-400 font-bold">{batchFeedbacks['writing']?.results?.filter((r: any) => r?.is_correct).length || 0}/{totalQ}</span>
+                              </div>
+                              <div className={`bg-slate-900/50 p-6 rounded-xl border-2 transition-all duration-300 ${fb?.is_correct ? 'border-green-500 bg-green-900/10' : fb && !fb.is_correct ? 'border-red-500/50 bg-red-900/10' : 'border-slate-700'}`}>
+                                <p className="text-white font-semibold text-lg mb-5"><span className="text-indigo-400 mr-2">{wIdx + 1}.</span>{ex.question || ex.prompt || 'Ejercicio de escritura'}</p>
+                                {isUnscramble ? (
+                                  <UnscrambleExercise exercise={ex} index={wIdx} userAnswer={selectedAnswers[key] || ''} onAnswerChange={(answer: string) => canInteract && handleAnswerSelect(key, answer)} onComplete={() => canInteract && !fb && autoEvaluateQuestion('writing', wIdx, selectedAnswers[key] || '')} feedback={fb} isLocked={!canInteract} />
+                                ) : isTranslation ? (
+                                  <div className="space-y-3">
+                                    <textarea
+                                      value={selectedAnswers[key] || ''}
+                                      onChange={(e) => canInteract && handleAnswerSelect(key, e.target.value)}
+                                      disabled={!canInteract}
+                                      placeholder="Escribe tu respuesta en inglés..."
+                                      className={`w-full p-3 rounded-lg border focus:outline-none transition-all ${!canInteract ? 'bg-slate-800 text-slate-400 border-slate-700 cursor-not-allowed' : 'bg-slate-700 text-white border-slate-600 focus:border-purple-500'}`}
+                                      rows={3}
+                                    />
+                                    {canInteract && selectedAnswers[key] && (
+                                      <button onClick={() => autoEvaluateQuestion('writing', wIdx, selectedAnswers[key])}
+                                        className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-sm transition-all shadow-lg">
+                                        ✅ Enviar respuesta
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : opts && opts.length > 0 ? (
+                                  <div className="flex gap-3 flex-wrap">
+                                    {opts.map((opt: string, i: number) => (
+                                      <button key={i} onClick={() => { if (canInteract) { handleAnswerSelect(key, opt); speak(opt); setTimeout(() => autoEvaluateQuestion('writing', wIdx, opt), 300); } }} disabled={!canInteract}
+                                        className={`exercise-opt-3d transition-all ${!canInteract ? (selectedAnswers[key] === opt ? (fb?.is_correct ? 'exercise-opt-selected !border-green-500 !bg-green-900/30' : 'exercise-opt-selected !border-red-500 !bg-red-900/30') : 'exercise-opt-locked') : selectedAnswers[key] === opt ? 'exercise-opt-selected' : 'exercise-opt-default'}`}
+                                      >{opt}</button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <UnscrambleExercise exercise={ex} index={wIdx} userAnswer={selectedAnswers[key] || ''} onAnswerChange={(answer: string) => canInteract && handleAnswerSelect(key, answer)} onComplete={() => canInteract && !fb && autoEvaluateQuestion('writing', wIdx, selectedAnswers[key] || '')} feedback={fb} isLocked={!canInteract} />
+                                )}
+                                {evaluatingSkill === 'writing' && <div className="mt-4 flex items-center gap-2 text-purple-400"><span className="animate-spin text-lg">⏳</span><span className="text-sm font-semibold">Evaluando...</span></div>}
+                                {fb && (
+                                  <div className={`mt-4 p-4 rounded-lg border transition-all slide-up-anim ${fb.is_correct ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'}`}>
+                                    <span className={`font-bold text-lg ${fb.is_correct ? 'text-green-400' : 'text-yellow-400'}`}>{fb.is_correct ? '✅ ¡Correcto!' : '💡 ¡Casi!'}</span>
+                                    <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
+                                    {!fb.is_correct && qAttempts < 2 && <p className="text-yellow-400 text-xs mt-2 font-semibold animate-pulse">🔄 {isTranslation ? 'Intenta escribir otra respuesta.' : 'Selecciona otra opción para tu segundo intento.'}</p>}
+                                    {!fb.is_correct && qAttempts >= 2 && <p className="text-slate-400 text-xs mt-2">Avanzando a la siguiente pregunta...</p>}
+                                  </div>
+                                )}
+                                {fb && fb.is_correct && (
+                                  <div className="mt-4 p-4 bg-slate-900/80 border border-cyan-500/30 rounded-xl flex items-center justify-between animate-fadeIn">
+                                    <div>
+                                      <span className="text-cyan-400 font-bold text-sm block">¡Correcto! Has ejercitado tu cerebro</span>
+                                      <p className="text-xs text-slate-300">Sigue así para completar tu lección.</p>
+                                    </div>
+                                    <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                                      <img src="/assets/images/cerebro-gym.webp" alt="Cerebro Tec-English AI" className="w-full h-auto object-contain animate-bounce drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
-                        })}
+                        })()}
                       </div>
-                      {(attempts['writing'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('writing', writingExercises)} disabled={evaluatingSkill === 'writing'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
-                          {evaluatingSkill === 'writing' ? '🤖 Analizando...' : '🤖 Evaluar escritura con IA'}
-                        </button>
-                      ) : (
-                        <div className="text-center p-4 bg-green-900/20 border border-green-700 rounded-lg">
-                          <p className="text-green-400 font-bold text-lg">✅ Evaluación de Writing finalizada</p>
-                          {isAlternateMode['writing'] && (
-                            <button onClick={() => exitAlternateMode('writing')} className="mt-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-semibold">← Volver a ejercicios originales</button>
-                          )}
-                          <button onClick={() => loadAlternateExercises('writing')} disabled={loadingAlternate === 'writing' || !!completedSkills['writing']} className={`repasar-btn-3d mt-3 ${completedSkills['writing'] ? 'repasar-completed' : ''}`}>
-                            {completedSkills['writing'] ? '✅ Ejercicio completado' : (loadingAlternate === 'writing' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )
                   )}
@@ -1745,100 +2244,109 @@ function App() {
                         <h4 className="text-pink-400 font-semibold mb-3 flex items-center gap-2"><span>🎤</span> Pronunciación y Speaking</h4>
                         <p className="text-slate-300 text-sm">Practica la pronunciación y graba tu voz para ser evaluada.</p>
                       </div>
-                      {speakingExercises.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-pink-400 font-semibold">Speaking - Practica tu voz</h4>
-                          {speakingExercises.map((ex, idx) => {
-                            const key = `p-${ex.id || idx}`;
-                            const fb: BatchResult | undefined = batchFeedbacks['pronunciation']?.results[idx];
-                            const currentAttempts = attempts['pronunciation'] || 0;
-                            const isLocked = currentAttempts === 2 || (currentAttempts === 1 && fb?.is_correct);
-                            const open = isExerciseOpen(key);
-                            const statusIcon = getExerciseIcon(fb, isLocked);
-                            const borderClass = fb ? (fb.is_correct ? 'accordion-correct' : isLocked ? 'accordion-wrong' : 'accordion-partial') : (recordingKey === key ? 'accordion-partial' : '');
-                            return (
-                              <div key={idx} className={borderClass}>
-                                <div className={`accordion-header ${borderClass}`} onClick={() => toggleExercise(key)}>
-                                  <div className="accordion-header-left">
-                                    <span className="accordion-num">{idx + 1}.</span>
-                                    <span className="accordion-preview">{ex.prompt}</span>
+                      {(() => {
+                        const totalQ = speakingExercises.length;
+                        const pIdx = currentQuestionIdx['pronunciation'] || 0;
+                        const pDone = pIdx >= totalQ;
+                        if (pDone && totalQ > 0) {
+                          const score = calculateSkillScore('pronunciation');
+                          const remaining = skillLabels.filter(s => s.key !== 'pronunciation' && !isSkillQuestionsDone(s.key) && !isSkillPerfect(s.key));
+                          const allDone = skillLabels.every(s => isSkillQuestionsDone(s.key) || isSkillPerfect(s.key));
+                          return (
+                            <div className="flex flex-col items-center py-10 slide-up-anim">
+                              <div className="text-center p-8 bg-gradient-to-b from-pink-900/40 to-rose-900/30 border-2 border-pink-500 rounded-2xl shadow-2xl max-w-md w-full celebration-glow">
+                                <p className="text-6xl mb-3">🎉</p>
+                                <h3 className="text-xl font-bold text-pink-400 mb-1">¡Speaking Completado!</h3>
+                                <p className="text-pink-300 text-lg mb-1">Puntaje: {score}/100</p>
+                                <p className="text-slate-400 text-sm mb-5">Has completado todos los ejercicios de pronunciación.</p>
+                                {allDone ? (
+                                  <div className="space-y-3 slide-up-anim-delay-2">
+                                    <p className="text-amber-400 font-bold text-sm">🏆 ¡Todas las habilidades completadas!</p>
+                                    <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="w-full px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Ir a la siguiente lección</button>
+                                    <button onClick={() => setActiveTab('progress')} className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">📊 Ver mi progreso</button>
                                   </div>
-                                  <span className="accordion-status">{statusIcon}</span>
-                                  <span className={`accordion-chevron ${open ? 'open' : ''}`}>▼</span>
-                                </div>
-                                <div className={`accordion-body ${open ? 'open' : ''}`}>
-                                  <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                                    <div className="flex gap-3 items-center">
-                                      <button onClick={() => { if (recordingKey) stopRecording(); speak(ex.prompt); }} disabled={isLocked} className={`px-4 py-2 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === ex.prompt ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-purple-600 hover:bg-purple-700'} text-white ${isLocked && !audioState.isPlaying ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                        {audioState.isPlaying && audioState.text === ex.prompt ? '⏸️ Pausar' : '🔊 Escuchar'}
-                                      </button>
-                                      <button onClick={() => recordingKey === key ? stopRecording() : startRecording(key)} disabled={isLocked} className={`px-4 py-2 rounded-lg font-semibold transition-all ${recordingKey === key ? 'bg-red-600 text-white animate-pulse ring-2 ring-red-400' : 'bg-pink-600 hover:bg-pink-700 text-white'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                        {recordingKey === key ? '⏹️ Detener' : '🎤 Grabar'}
-                                      </button>
-                                      {recordingKey === key && (
-                                        <div className="flex items-center gap-2 bg-green-900/50 px-3 py-1.5 rounded-full border border-green-600">
-                                          <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse"></div>
-                                          <span className="text-green-400 text-sm font-mono font-bold">{formatRecordTime(recordingTime)}</span>
-                                        </div>
-                                      )}
-                                      {selectedAnswers[key] && recordingKey !== key && (
-                                        <span className="text-green-400 text-sm self-center italic bg-green-900/30 px-2 py-1 rounded border border-green-700">"{selectedAnswers[key]}"</span>
+                                ) : (
+                                  <div className="space-y-3 slide-up-anim-delay-1">
+                                    <p className="text-slate-300 text-sm">Continúa con la siguiente habilidad:</p>
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                      {remaining.length > 0 ? remaining.map(s => (
+                                        <button key={s.key} onClick={() => setSkillTab(s.key)} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-all text-sm">{s.icon} {s.label}</button>
+                                      )) : (
+                                        <button onClick={() => { const subIdx = subtopicsList.findIndex(s => s.subtopic_id === currentSubtopicId); if (subIdx >= 0 && subIdx < subtopicsList.length - 1) setCurrentSubtopicId(subtopicsList[subIdx + 1].subtopic_id); else setActiveTab('lesson'); }} className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg">➡️ Siguiente lección</button>
                                       )}
                                     </div>
-                                    {fb && (
-                                      <div className="mt-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                                        <span className={`font-bold ${getScoreColor(fb.score)}`}>{fb.is_correct ? '✅ Correcto' : '💡 Necesita mejora'} - Puntaje: {fb.score}/100</span>
-                                        <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
-                                        <p className="text-slate-400 text-xs italic mt-1">📚 Fundamento: {fb.pedagogical_reason}</p>
-                                      </div>
-                                    )}
                                   </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <h4 className="text-pink-400 font-semibold">Pronunciación - Tips</h4>
-                        {pronunciationExercises.map((ex, idx) => {
-                          const key = `pron-tip-${idx}`;
-                          const open = isExerciseOpen(key);
-                          return (
-                            <div key={idx}>
-                              <div className={`accordion-header`} onClick={() => toggleExercise(key)}>
-                                <div className="accordion-header-left">
-                                  <span className="accordion-num">{idx + 1}.</span>
-                                  <span className="accordion-preview">"{ex.phrase}"</span>
-                                </div>
-                                <span className="accordion-status">🔊</span>
-                                <span className={`accordion-chevron ${open ? 'open' : ''}`}>▼</span>
-                              </div>
-                              <div className={`accordion-body ${open ? 'open' : ''}`}>
-                                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                                  <p className="text-pink-400 text-sm italic mb-3">{ex.focus}</p>
-                                  <button onClick={() => speak(ex.phrase)} className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-semibold text-sm">🔊 Escuchar pronunciación</button>
-                                </div>
+                                )}
+                                <button onClick={() => loadAlternateExercises('pronunciation')} disabled={loadingAlternate === 'pronunciation' || !!completedSkills['pronunciation']} className={`repasar-btn-3d mt-3 ${completedSkills['pronunciation'] ? 'repasar-completed' : ''}`}>
+                                  {completedSkills['pronunciation'] ? '✅ Ejercicio completado' : (loadingAlternate === 'pronunciation' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
+                                </button>
                               </div>
                             </div>
                           );
-                        })}
-                      </div>
-                      {(attempts['pronunciation'] || 0) < 2 ? (
-                        <button onClick={() => evaluateBatch('pronunciation', speakingExercises)} disabled={evaluatingSkill === 'pronunciation'} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
-                          {evaluatingSkill === 'pronunciation' ? '🤖 Analizando...' : '🤖 Evaluar speaking con IA'}
-                        </button>
-                      ) : (
-                        <div className="text-center p-4 bg-green-900/20 border border-green-700 rounded-lg">
-                          <p className="text-green-400 font-bold text-lg">✅ Evaluación de Speaking finalizada</p>
-                          {isAlternateMode['pronunciation'] && (
-                            <button onClick={() => exitAlternateMode('pronunciation')} className="mt-3 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm font-semibold">← Volver a ejercicios originales</button>
-                          )}
-                          <button onClick={() => loadAlternateExercises('pronunciation')} disabled={loadingAlternate === 'pronunciation' || !!completedSkills['pronunciation']} className={`repasar-btn-3d mt-3 ${completedSkills['pronunciation'] ? 'repasar-completed' : ''}`}>
-                            {completedSkills['pronunciation'] ? '✅ Ejercicio completado' : (loadingAlternate === 'pronunciation' ? '🤖 Generando...' : '🔄 Repasar con 5 ejercicios diferentes')}
-                          </button>
-                        </div>
-                      )}
+                        }
+                        if (totalQ === 0) return null;
+                        const ex = speakingExercises[pIdx];
+                        const key = `p-${ex.id || pIdx}`;
+                        const fb: BatchResult | undefined = batchFeedbacks['pronunciation']?.results[pIdx];
+                        const qKey = `pronunciation-${pIdx}`;
+                        const qAttempts = questionAttemptCount[qKey] || 0;
+                        const canInteract = qAttempts < 2 && !(fb?.is_correct);
+                        return (
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3 mb-5">
+                              <span className="text-sm text-slate-400 font-medium whitespace-nowrap">Ejercicio {pIdx + 1} de {totalQ}</span>
+                              <div className="flex-1 bg-slate-700 rounded-full h-2.5"><div className="bg-pink-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${(pIdx / totalQ) * 100}%` }} /></div>
+                              <span className="text-sm text-pink-400 font-bold">{batchFeedbacks['pronunciation']?.results?.filter((r: any) => r?.is_correct).length || 0}/{totalQ}</span>
+                            </div>
+                            <div className={`bg-slate-900/50 p-6 rounded-xl border-2 transition-all duration-300 ${fb?.is_correct ? 'border-green-500 bg-green-900/10' : fb && !fb.is_correct ? 'border-red-500/50 bg-red-900/10' : 'border-slate-700'}`}>
+                              <p className="text-white font-semibold text-lg mb-5"><span className="text-pink-400 mr-2">{pIdx + 1}.</span>{ex.prompt}</p>
+                              <div className="flex gap-3 items-center flex-wrap">
+                                <button onClick={() => { if (recordingKey) stopRecording(); speak(ex.prompt); }} className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${audioState.isPlaying && audioState.text === ex.prompt ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
+                                  {audioState.isPlaying && audioState.text === ex.prompt ? '⏸️ Pausar' : '🔊 Escuchar'}
+                                </button>
+                                <button onClick={() => recordingKey === key ? stopRecording() : startRecording(key, (transcript) => autoEvaluateQuestion('pronunciation', pIdx, transcript))} className={`px-5 py-2.5 rounded-lg font-semibold transition-all ${recordingKey === key ? 'bg-red-600 text-white animate-pulse ring-2 ring-red-400' : 'bg-pink-600 hover:bg-pink-700 text-white'}`}>
+                                  {recordingKey === key ? '⏹️ Detener' : '🎤 Grabar'}
+                                </button>
+                                {recordingKey === key && (
+                                  <div className="flex items-center gap-2 bg-green-900/50 px-3 py-1.5 rounded-full border border-green-600">
+                                    <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span className="text-green-400 text-sm font-mono font-bold">{formatRecordTime(recordingTime)}</span>
+                                  </div>
+                                )}
+                                {selectedAnswers[key] && recordingKey !== key && (
+                                  <span className="text-green-400 text-sm italic bg-green-900/30 px-3 py-1.5 rounded border border-green-700">"{selectedAnswers[key]}"</span>
+                                )}
+                              </div>
+                              {fb && (
+                                <div className={`mt-4 p-4 rounded-lg border transition-all slide-up-anim ${fb.is_correct ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'}`}>
+                                  <span className={`font-bold text-lg ${fb.is_correct ? 'text-green-400' : 'text-yellow-400'}`}>{fb.is_correct ? '✅ ¡Correcto!' : '💡 ¡Casi!'}</span>
+                                  <p className="text-slate-200 text-sm mt-1">{fb.feedback}</p>
+                                  {!fb.is_correct && qAttempts < 2 && <p className="text-yellow-400 text-xs mt-2 font-semibold animate-pulse">🔄 Intenta grabar tu voz de nuevo con más claridad.</p>}
+                                  {!fb.is_correct && qAttempts >= 2 && <p className="text-slate-400 text-xs mt-2">Avanzando al siguiente ejercicio...</p>}
+                                </div>
+                              )}
+                              {fb && fb.is_correct && (
+                                <div className="mt-4 p-4 bg-slate-900/80 border border-cyan-500/30 rounded-xl flex items-center justify-between animate-fadeIn">
+                                  <div>
+                                    <span className="text-cyan-400 font-bold text-sm block">¡Correcto! Has ejercitado tu cerebro</span>
+                                    <p className="text-xs text-slate-300">Sigue así para completar tu lección.</p>
+                                  </div>
+                                  <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                                    <img src="/assets/images/cerebro-gym.webp" alt="Cerebro Tec-English AI" className="w-full h-auto object-contain animate-bounce drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            {pronunciationExercises.length > 0 && (
+                              <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                                <p className="text-pink-400 text-sm font-semibold mb-2">💡 Tip de pronunciación:</p>
+                                <p className="text-slate-300 text-sm italic">{pronunciationExercises[pIdx % pronunciationExercises.length]?.focus}</p>
+                                <button onClick={() => speak(pronunciationExercises[pIdx % pronunciationExercises.length]?.phrase || ex.prompt)} className="mt-2 px-3 py-1.5 bg-pink-600/50 hover:bg-pink-600 text-white rounded-lg text-xs font-semibold transition-all">🔊 Escuchar pronunciación correcta</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )
                   )}
@@ -1854,24 +2362,6 @@ function App() {
           </div>
         )}
       </div>
-
-      {/* FLECHA FLOTANTE - Scroll Hint */}
-      {showScrollHint && data && activeTab === 'lesson' && (
-        <div className="fixed top-0 left-0 right-0 z-40 flex flex-col items-center pt-3 pb-4 px-4 bg-gradient-to-b from-slate-900 via-slate-900/95 to-transparent pointer-events-none">
-          <div className="bg-slate-800/90 backdrop-blur-md border border-amber-500/40 rounded-2xl shadow-2xl shadow-amber-500/10 px-6 py-4 flex flex-col items-center gap-2 pointer-events-auto">
-            <p className="text-amber-400 font-extrabold text-sm md:text-base tracking-wide animate-pulse text-center">Desliza hacia abajo para ver el contenido</p>
-            <div className="animate-bounce cursor-pointer" onClick={() => document.querySelector('.panel-3d')?.scrollIntoView({ behavior: 'smooth' })}>
-              <svg className="w-16 h-16 md:w-20 md:h-20 text-amber-400 drop-shadow-[0_0_16px_rgba(251,191,36,0.6)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer select-none group/check">
-              <input type="checkbox" onChange={dismissScrollHint} className="w-4 h-4 rounded border-slate-500 bg-slate-700 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer" />
-              <span className="text-slate-400 text-xs group-hover/check:text-slate-200 transition-colors">No volver a mostrar</span>
-            </label>
-          </div>
-        </div>
-      )}
 
       {/* MODAL DE AYUDA GLOBAL (Corregido: ahora está dentro del return de App) */}
       <HelpModal 

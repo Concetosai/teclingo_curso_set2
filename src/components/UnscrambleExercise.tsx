@@ -1,15 +1,17 @@
 import { useState } from 'react';
+import { speak } from '../services/ttsService';
 
 interface UnscrambleExerciseProps {
   exercise: { words?: string[]; type?: string; question?: string; prompt?: string };
   index: number;
   userAnswer: string;
   onAnswerChange: (answer: string) => void;
+  onComplete?: () => void;
   feedback?: { is_correct: boolean; score: number; feedback: string; pedagogical_reason: string };
   isLocked: boolean;
 }
 
-const UnscrambleExercise = ({ exercise, index, userAnswer, onAnswerChange, feedback, isLocked }: UnscrambleExerciseProps) => {
+const UnscrambleExercise = ({ exercise, index, userAnswer, onAnswerChange, onComplete, feedback, isLocked }: UnscrambleExerciseProps) => {
   const isUnscramble = exercise.type === 'unscramble' && Array.isArray(exercise.words) && exercise.words.length > 0;
   
   // Función para mezclar las palabras aleatoriamente al inicio
@@ -30,7 +32,11 @@ const UnscrambleExercise = ({ exercise, index, userAnswer, onAnswerChange, feedb
     const newBank = [...bankWords];
     newBank.splice(indexInBank, 1);
     setBankWords(newBank);
-    onAnswerChange([...selectedWords, word].join(' '));
+    const newAnswer = [...selectedWords, word].join(' ');
+    onAnswerChange(newAnswer);
+    if (newBank.length === 0 && onComplete) {
+      setTimeout(() => onComplete(), 100);
+    }
   };
 
   const moveToBank = (word: string, indexInAnswer: number) => {
@@ -92,7 +98,7 @@ const UnscrambleExercise = ({ exercise, index, userAnswer, onAnswerChange, feedb
             selectedWords.map((word, idx) => (
               <button
                 key={`ans-${idx}`}
-                onClick={() => moveToBank(word, idx)}
+                onClick={() => { moveToBank(word, idx); speak(word); }}
                 disabled={isLocked}
                 className={`px-5 py-2.5 rounded-lg font-bold text-lg shadow-md transition-all transform hover:scale-105 active:scale-95 ${isLocked ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 text-white border-2 border-purple-400'}`}
               >
@@ -110,7 +116,7 @@ const UnscrambleExercise = ({ exercise, index, userAnswer, onAnswerChange, feedb
           {bankWords.map((word, idx) => (
             <button
               key={`bank-${idx}`}
-              onClick={() => moveToAnswer(word, idx)}
+              onClick={() => { moveToAnswer(word, idx); speak(word); }}
               disabled={isLocked}
               className={`px-5 py-2.5 rounded-lg font-bold text-lg border-2 transition-all transform hover:scale-105 active:scale-95 ${isLocked ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-500 hover:border-purple-500 hover:text-white shadow-sm'}`}
             >

@@ -142,6 +142,7 @@ export default function ExamPage({ userId, userContext }: Props) {
   const [miniSkill, setMiniSkill] = useState<SkillTab>('grammar');
   const [miniAnswers, setMiniAnswers] = useState<Record<string, string>>({});
   const [miniResults, setMiniResults] = useState<{ skill: string; score: number; correct: number; total: number } | null>(null);
+  const [miniSelectedQuestions, setMiniSelectedQuestions] = useState<any>(null);
 
   // Writing/pronunciation AI state
   const [aiFeedback, setAiFeedback] = useState<BatchFeedback | null>(null);
@@ -159,10 +160,17 @@ export default function ExamPage({ userId, userContext }: Props) {
   // Timer
   useEffect(() => {
     if (status !== 'in_progress') return;
-    if (timeLeft <= 0) { handleSubmitExam(); return; }
-    const t = setInterval(() => setTimeLeft(p => p - 1), 1000);
+    const t = setInterval(() => {
+      setTimeLeft(p => {
+        if (p <= 1) {
+          handleSubmitExam();
+          return 0;
+        }
+        return p - 1;
+      });
+    }, 1000);
     return () => clearInterval(t);
-  }, [status, timeLeft]);
+  }, [status]);
 
   const formatTime = (s: number) => { const m = Math.floor(s / 60); const sec = s % 60; return `${m}:${sec.toString().padStart(2, '0')}`; };
 
@@ -268,32 +276,33 @@ export default function ExamPage({ userId, userContext }: Props) {
     setMiniAnswers({});
     setMiniResults(null);
     setAiFeedback(null);
+    let selected: any = null;
+    if (skill === 'grammar') selected = pickRandom(GRAMMAR_BANK, 5);
+    else if (skill === 'vocabulary') selected = pickRandom(VOCAB_BANK, 5);
+    else if (skill === 'reading') selected = pickRandom(READING_BANK, 1)[0];
+    else if (skill === 'listening') selected = pickRandom(LISTENING_BANK, 1)[0];
+    else if (skill === 'writing') selected = pickRandom(WRITING_BANK, 3);
+    else if (skill === 'pronunciation') selected = pickRandom(PRONUNCIATION_BANK, 3);
+    setMiniSelectedQuestions(selected);
     setStatus('mini_in_progress');
   };
 
   const evaluateMiniExam = async () => {
     setSubmitting(true);
     const skill = miniSkill;
+    const bank = miniSelectedQuestions;
     let correct = 0; let total = 0; let pct = 0;
 
-    if (skill === 'grammar') {
-      const bank = pickRandom(GRAMMAR_BANK, 5);
-      for (const q of bank) { total++; if (normalizeAnswer(miniAnswers[q.id] || '') === normalizeAnswer(q.answer)) correct++; }
-      pct = Math.round((correct / total) * 100);
-    } else if (skill === 'vocabulary') {
-      const bank = pickRandom(VOCAB_BANK, 5);
+    if (skill === 'grammar' || skill === 'vocabulary') {
       for (const q of bank) { total++; if (normalizeAnswer(miniAnswers[q.id] || '') === normalizeAnswer(q.answer)) correct++; }
       pct = Math.round((correct / total) * 100);
     } else if (skill === 'reading') {
-      const passage = pickRandom(READING_BANK, 1)[0];
-      for (const q of passage.questions) { total++; if (normalizeAnswer(miniAnswers[q.id] || '') === normalizeAnswer(q.answer)) correct++; }
+      for (const q of bank.questions) { total++; if (normalizeAnswer(miniAnswers[q.id] || '') === normalizeAnswer(q.answer)) correct++; }
       pct = Math.round((correct / total) * 100);
     } else if (skill === 'listening') {
-      const audio = pickRandom(LISTENING_BANK, 1)[0];
-      for (const q of audio.questions) { total++; if (normalizeAnswer(miniAnswers[q.id] || '') === normalizeAnswer(q.answer)) correct++; }
+      for (const q of bank.questions) { total++; if (normalizeAnswer(miniAnswers[q.id] || '') === normalizeAnswer(q.answer)) correct++; }
       pct = Math.round((correct / total) * 100);
     } else if (skill === 'writing' || skill === 'pronunciation') {
-      const bank = skill === 'writing' ? pickRandom(WRITING_BANK, 3) : pickRandom(PRONUNCIATION_BANK, 3);
       total = bank.length;
       const payload = bank.map((ex: any) => ({
         question: ex.question || ex.prompt || '', user_answer: miniAnswers[ex.id] || '', correct_answer: ex.answer || ex.prompt || '',
@@ -417,12 +426,12 @@ export default function ExamPage({ userId, userContext }: Props) {
           <button onClick={() => setStatus('mini_intro')} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold">← Salir</button>
         </div>
 
-        {miniSkill === 'grammar' && <MiniGrammarExam answers={miniAnswers} setAnswers={setMiniAnswers} />}
-        {miniSkill === 'vocabulary' && <MiniVocabExam answers={miniAnswers} setAnswers={setMiniAnswers} />}
-        {miniSkill === 'reading' && <MiniReadingExam answers={miniAnswers} setAnswers={setMiniAnswers} />}
-        {miniSkill === 'listening' && <MiniListeningExam answers={miniAnswers} setAnswers={setMiniAnswers} />}
-        {miniSkill === 'writing' && <MiniWritingExam answers={miniAnswers} setAnswers={setMiniAnswers} />}
-        {miniSkill === 'pronunciation' && <MiniPronunciationExam answers={miniAnswers} setAnswers={setMiniAnswers} />}
+        {miniSkill === 'grammar' && <MiniGrammarExam answers={miniAnswers} setAnswers={setMiniAnswers} bank={miniSelectedQuestions} />}
+        {miniSkill === 'vocabulary' && <MiniVocabExam answers={miniAnswers} setAnswers={setMiniAnswers} bank={miniSelectedQuestions} />}
+        {miniSkill === 'reading' && <MiniReadingExam answers={miniAnswers} setAnswers={setMiniAnswers} passage={miniSelectedQuestions} />}
+        {miniSkill === 'listening' && <MiniListeningExam answers={miniAnswers} setAnswers={setMiniAnswers} audio={miniSelectedQuestions} />}
+        {miniSkill === 'writing' && <MiniWritingExam answers={miniAnswers} setAnswers={setMiniAnswers} bank={miniSelectedQuestions} />}
+        {miniSkill === 'pronunciation' && <MiniPronunciationExam answers={miniAnswers} setAnswers={setMiniAnswers} bank={miniSelectedQuestions} />}
 
         {!miniResults && (
           <button onClick={evaluateMiniExam} disabled={submitting} className="w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 text-white rounded-lg font-bold text-lg">
@@ -736,8 +745,7 @@ function PronunciationSection({ exercises, answers, setAnswers }: { exercises: P
 // MINI EXAM COMPONENTS
 // ==========================================
 
-function MiniGrammarExam({ answers, setAnswers }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
-  const [bank] = useState(() => pickRandom(GRAMMAR_BANK, 5));
+function MiniGrammarExam({ answers, setAnswers, bank }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>; bank: ExamQuestion[] }) {
   return (
     <div className="space-y-4">
       <p className="text-slate-400 text-sm">Responde las 5 preguntas de Grammar.</p>
@@ -755,8 +763,7 @@ function MiniGrammarExam({ answers, setAnswers }: { answers: Record<string, stri
   );
 }
 
-function MiniVocabExam({ answers, setAnswers }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
-  const [bank] = useState(() => pickRandom(VOCAB_BANK, 5));
+function MiniVocabExam({ answers, setAnswers, bank }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>; bank: ExamQuestion[] }) {
   return (
     <div className="space-y-4">
       <p className="text-slate-400 text-sm">Escribe la palabra en ingles.</p>
@@ -770,8 +777,7 @@ function MiniVocabExam({ answers, setAnswers }: { answers: Record<string, string
   );
 }
 
-function MiniReadingExam({ answers, setAnswers }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
-  const [passage] = useState(() => pickRandom(READING_BANK, 1)[0]);
+function MiniReadingExam({ answers, setAnswers, passage }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>; passage: ReadingPassage }) {
   return (
     <div className="space-y-4">
       <div className="bg-slate-900/50 p-5 rounded-lg border border-slate-700">
@@ -791,8 +797,7 @@ function MiniReadingExam({ answers, setAnswers }: { answers: Record<string, stri
   );
 }
 
-function MiniListeningExam({ answers, setAnswers }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
-  const [audio] = useState(() => pickRandom(LISTENING_BANK, 1)[0]);
+function MiniListeningExam({ answers, setAnswers, audio }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>; audio: ListeningAudio }) {
   return (
     <div className="space-y-4">
       <div className="bg-slate-900/50 p-5 rounded-lg border border-slate-700">
@@ -813,8 +818,7 @@ function MiniListeningExam({ answers, setAnswers }: { answers: Record<string, st
   );
 }
 
-function MiniWritingExam({ answers, setAnswers }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
-  const [bank] = useState(() => pickRandom(WRITING_BANK, 3));
+function MiniWritingExam({ answers, setAnswers, bank }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>; bank: WritingExercise[] }) {
   return (
     <div className="space-y-4">
       <p className="text-slate-400 text-sm">Escribe tu respuesta. La IA la evaluara.</p>
@@ -840,8 +844,7 @@ function MiniWritingExam({ answers, setAnswers }: { answers: Record<string, stri
   );
 }
 
-function MiniPronunciationExam({ answers, setAnswers }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
-  const [bank] = useState(() => pickRandom(PRONUNCIATION_BANK, 3));
+function MiniPronunciationExam({ answers, setAnswers, bank }: { answers: Record<string, string>; setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>; bank: PronunciationExercise[] }) {
   const startRecording = (id: string) => {
     // @ts-ignore
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
