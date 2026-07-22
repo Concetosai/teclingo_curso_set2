@@ -28,7 +28,7 @@ class TutorService:
         # 🆕 CAMBIO CLAVE 1: Incluir tipo de ejercicio y banco de palabras
         exercises_context = ""
         for i, ex in enumerate(exercises):
-            ex_type = ex.get('type', 'unknown')
+        exercises_context = ""
             words_bank = ex.get('words', [])
             exercises_context += f"{i+1}. Type: '{ex_type}' | Question/Prompt: '{ex.get('question', '')}' | User Answer: '{ex.get('user_answer', '')}' | Expected: '{ex.get('correct_answer', '')}'"
             if ex_type == 'unscramble' and words_bank:
@@ -68,9 +68,24 @@ CRITICAL PEDAGOGICAL RULES:
     - DO NOT require additional words like institution names, places, or context if those words are NOT in the Word Bank.
     - If the user used ALL words from the bank in a grammatically correct order, give FULL CREDIT (100/100).
     - NEVER penalize or give partial credit if the user correctly ordered the words but didn't add extra context words.
+    - Example: If Word Bank is ["I", "am", "a", "student"] and user writes "I am a student", give 100/100 even if institutional context suggests adding "at Tecnológico Nacional de México".
+16. *** ABSOLUTELY CRITICAL - UNSCRAMBLE EXERCISES (Type: 'unscramble') ***
+    - These exercises provide a "Word Bank" with EXACTLY the words the user must use.
+    - Evaluate ONLY if the user formed a grammatically correct sentence using EXACTLY the words from the Word Bank.
+    - DO NOT require additional words like institution names, places, or context if those words are NOT in the Word Bank.
+    - If the user used ALL words from the bank in a grammatically correct order, give FULL CREDIT (100/100).
+    - NEVER penalize or give partial credit if the user correctly ordered the words but didn't add extra context words.
     - NEVER tell the user they need to "specify" or "add" information that is already present in their answer.
     - Example: If Word Bank is ["The", "book", "is", "on", "the", "table"] and user writes "The book is on the table", give 100/100. DO NOT say "you need to specify where the book is" because "on the table" already specifies it.
     - Example: If Word Bank is ["I", "am", "a", "student"] and user writes "I am a student", give 100/100 even if institutional context suggests adding "at Tecnológico Nacional de México".
+
+16. *** ABSOLUTELY CRITICAL - UNSCRAMBLE EXERCISES (Type: 'unscramble') ***
+   - These exercises provide a "Word Bank" with EXACTLY the words the user must use.
+   - Evaluate ONLY if the user formed a grammatically correct sentence using EXACTLY the words from the Word Bank.
+   - DO NOT require additional words like institution names, places, or context if those words are NOT in the Word Bank.
+   - If the user used ALL words from the bank in a grammatically correct order, give FULL CREDIT (100/100).
+   - NEVER penalize or give partial credit if the user correctly ordered the words but didn't add extra context words.
+   - Example: If Word Bank is ["I", "am", "a", "student"] and user writes "I am a student", give 100/100 even if institutional context suggests adding "at Tecnológico Nacional de México".
 
 Return a JSON object with this EXACT structure:
 {{
@@ -144,6 +159,14 @@ EXERCISE FORMAT by skill:
 - listening: Short dialogue script + 3 questions. Return "script" and "questions" array.
 - writing: 3 sentence writing prompts. Each exercise has "question", "answer".
 - pronunciation: 3 speaking prompts. Each exercise has "prompt".
+
+16. *** ABSOLUTELY CRITICAL - UNSCRAMBLE EXERCISES (Type: 'unscramble') ***
+   - These exercises provide a "Word Bank" with EXACTLY the words the user must use.
+   - Evaluate ONLY if the user formed a grammatically correct sentence using EXACTLY the words from the Word Bank.
+   - DO NOT require additional words like institution names, places, or context if those words are NOT in the Word Bank.
+   - If the user used ALL words from the bank in a grammatically correct order, give FULL CREDIT (100/100).
+   - NEVER penalize or give partial credit if the user correctly ordered the words but didn't add extra context words.
+   - Example: If Word Bank is ["I", "am", "a", "student"] and user writes "I am a student", give 100/100 even if institutional context suggests adding "at Tecnológico Nacional de México".
 
 Return a JSON object with this EXACT structure:
 {{

@@ -13,5 +13,8 @@ __pycache__/
 .vscode/
 .idea/
 *.bak
+*.backup
+*.bak_*
 repomix-output.xml
 ruta
+-w

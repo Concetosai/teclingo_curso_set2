@@ -5,17 +5,20 @@
 // ❌ NO incluye scripts de setup, pruebas o inicialización.
 // ⚠️ Los scripts de una sola ejecución están en pruebas.gs
 
-// --- CONFIGURACIÓN GLOBAL ---
+// --- CONFIGURACIÓN GLOBAL (Solo actualiza este bloque en tu Code.gs) ---
 const CONFIG = {
-  // ID de tu hoja de cálculo
   SPREADSHEET_ID: '19Xa2wUcAGWgyp-AA8b1vrPFsLnZxZqNXbzCHG2pN6L8',
-  
-  // Cuenta de correo para envíos (configurada en Gmail)
   EMAIL_FROM: 'conceptosaimx@gmail.com',
   
-  // Nombres de las hojas (pestañas)
+  // ⚠️ Nombres exactos de las pestañas (Sincronizados con el Setup)
   SHEET_NAMES: {
-    USERS: 'Usuarios',
+    // Pestañas del Tutor AI (en minúsculas tal como las creó el setup)
+    USERS: 'users',
+    USER_COURSE_STATES: 'user_course_states',
+    DAILY_LOGS: 'daily_logs',
+    NEXT_SESSION_PREPS: 'next_session_preps',
+    
+    // Pestañas adicionales de Teclingo
     GRAMMAR_LOGS: 'RegistrosGramatica',
     FEEDBACK: 'Feedback',
     TOEFL_LOGS: 'RegistrosTOEFL',
@@ -911,6 +914,15 @@ function doPost(e) {
       case 'obtenerADN':
         respuesta = obtenerADN(params.datos);
         break;
+
+      // ----------------------------------------------------
+      // NUEVA ACCIÓN AGREGADA
+      // ----------------------------------------------------
+      case 'obtenerEstadoTutor':
+        // Asegúrate de tener implementada la función obtenerEstadoTutor(params.datos)
+        respuesta = obtenerEstadoTutor(params.datos);
+        break;
+      // ----------------------------------------------------
         
       case 'enviarBienvenida':
         respuesta = enviarEmailBienvenidaPublico(params.datos);
@@ -1226,5 +1238,83 @@ function validarTokenSesion(token) {
   } catch (error) {
     console.error('Error validando token:', error);
     return { valido: false, mensaje: error.toString() };
+  }
+}
+
+/**
+ * Obtiene el estado actual del curso y la siguiente preparación para un usuario
+ * @param {Object} datos - { user_id }
+ * @returns {Object} Estado del tutor registrado en Sheets
+ */
+function obtenerEstadoTutor(datos) {
+  try {
+    const userId = datos ? datos.user_id : null;
+    if (!userId) {
+      return { success: false, mensaje: 'El parámetro user_id es requerido.' };
+    }
+
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheetState = ss.getSheetByName(CONFIG.SHEET_NAMES.USER_COURSE_STATES);
+    const sheetPrep = ss.getSheetByName(CONFIG.SHEET_NAMES.NEXT_SESSION_PREPS);
+
+    let userState = null;
+
+    // 1. Buscar en user_course_states
+    if (sheetState) {
+      const dataState = sheetState.getDataRange().getValues();
+      for (let i = 1; i < dataState.length; i++) {
+        if (dataState[i][0] === userId) { // Columna A: user_id
+          userState = {
+            user_id: dataState[i][0],
+            current_day_number: dataState[i][1],
+            streak_days: dataState[i][2],
+            last_completed_date: dataState[i][3],
+            total_time_minutes: dataState[i][4],
+            updated_at: dataState[i][5]
+          };
+          break;
+        }
+      }
+    }
+
+    // Si el usuario es nuevo y no tiene estado, devolvemos el Día 1 por defecto
+    if (!userState) {
+      userState = {
+        user_id: userId,
+        current_day_number: 1,
+        streak_days: 0,
+        total_time_minutes: 0
+      };
+    }
+
+    // 2. Buscar en next_session_preps
+    let nextPrep = null;
+    if (sheetPrep) {
+      const dataPrep = sheetPrep.getDataRange().getValues();
+      for (let i = 1; i < dataPrep.length; i++) {
+        // Columna B: user_id | Columna C: target_day_number
+        if (dataPrep[i][1] === userId && dataPrep[i][2] === userState.current_day_number) {
+          nextPrep = {
+            prep_id: dataPrep[i][0],
+            user_id: dataPrep[i][1],
+            target_day_number: dataPrep[i][2],
+            topic: dataPrep[i][3],
+            warmup_question: dataPrep[i][4],
+            suggested_vocabulary: dataPrep[i][5]
+          };
+          break;
+        }
+      }
+    }
+
+    return {
+      success: true,
+      state: userState,
+      next_prep: nextPrep
+    };
+
+  } catch (error) {
+    console.error('Error en obtenerEstadoTutor:', error);
+    return { success: false, mensaje: 'Error al consultar la hoja: ' + error.toString() };
   }
 }

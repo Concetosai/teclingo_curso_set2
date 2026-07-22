@@ -18,6 +18,7 @@ import AIConversationExercise from './components/AIConversationExercise'
 import OnboardingFlow from './components/Onboarding/OnboardingFlow';
 import { loginConGoogle, logout, obtenerUsuarioActual } from './services/authService'
 import { saveProgress, saveActivity, logEntrada, logSalida } from './services/sheetsService'
+import { cargarEstadoTutor, type TutorContext } from './services/tutorService'
 import { useLastSession } from './hooks/useLastSession'
 import { speak as ttsSpeak, stop as ttsStop, pause as ttsPause, resume as ttsResume, isPlaying as ttsIsPlaying, isPaused as ttsIsPaused } from './services/ttsService'
 
@@ -150,6 +151,10 @@ function App() {
   // Estados para el Modal de Ayuda
   const [showHelp, setShowHelp] = useState(false);
   const [currentHelpType, setCurrentHelpType] = useState<string>('grammar');
+
+  // Estado del Tutor AI
+  const [tutorContext, setTutorContext] = useState<TutorContext | null>(null);
+  const [loadingTutor, setLoadingTutor] = useState(false);
 
   const openHelp = (type: string) => {
     setCurrentHelpType(type);
@@ -542,6 +547,16 @@ function App() {
     if (!user || isGuest) return;
     saveLastSession({ tab: activeTab, subtopicId: currentSubtopicId, skillTab });
   }, [activeTab, currentSubtopicId, skillTab, user, isGuest, saveLastSession]);
+
+  // Cargar estado del Tutor AI
+  useEffect(() => {
+    if (!user) return;
+    setLoadingTutor(true);
+    cargarEstadoTutor(userId).then(ctx => {
+      setTutorContext(ctx);
+      setLoadingTutor(false);
+    }).catch(() => setLoadingTutor(false));
+  }, [user, userId]);
 
   // =============================================
   // PANTALLA DE SELECCIÓN DE EXPERIENCIAS (PRUEBA SIN REGISTRO)
@@ -1587,6 +1602,59 @@ function App() {
 
         {activeTab === 'lesson' && (
           <div className="space-y-8">
+            {/* CARD DE CONTEXTO DEL TUTOR AI */}
+            {loadingTutor && (
+              <div className="bg-slate-800/60 border border-purple-500/20 rounded-2xl p-4 animate-pulse">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">🤖</span>
+                  <span className="text-xs font-semibold text-purple-400 uppercase tracking-widest">Cargando contexto del Tutor...</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-slate-700 rounded w-1/3"></div>
+                  <div className="h-3 bg-slate-700 rounded w-2/3"></div>
+                </div>
+              </div>
+            )}
+            {!loadingTutor && tutorContext && (
+              <div className="bg-gradient-to-r from-purple-900/40 to-indigo-900/40 border border-purple-500/30 rounded-2xl overflow-hidden">
+                <div className="px-5 pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">🤖</span>
+                    <h3 className="text-sm font-bold text-purple-300 uppercase tracking-widest">Tu Tutor IA — Día {tutorContext.state.current_day_number}</h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="text-center bg-slate-900/40 rounded-xl py-2 px-1">
+                      <p className="text-xl font-black text-white">{tutorContext.state.streak_days}</p>
+                      <p className="text-[9px] text-slate-400 uppercase tracking-wider">Racha 🔥</p>
+                    </div>
+                    <div className="text-center bg-slate-900/40 rounded-xl py-2 px-1">
+                      <p className="text-xl font-black text-blue-400">{tutorContext.state.current_day_number}</p>
+                      <p className="text-[9px] text-slate-400 uppercase tracking-wider">Día</p>
+                    </div>
+                    <div className="text-center bg-slate-900/40 rounded-xl py-2 px-1">
+                      <p className="text-xl font-black text-emerald-400">{tutorContext.state.total_time_minutes}<span className="text-xs font-normal text-slate-500">m</span></p>
+                      <p className="text-[9px] text-slate-400 uppercase tracking-wider">Practicado</p>
+                    </div>
+                  </div>
+                  {tutorContext.next_prep && (
+                    <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/40">
+                      <p className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider mb-1">Tema de hoy</p>
+                      <p className="text-white text-sm font-bold mb-2">{tutorContext.next_prep.topic}</p>
+                      <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/30">
+                        <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Pregunta de calentamiento</p>
+                        <p className="text-slate-200 text-xs leading-relaxed italic">"{tutorContext.next_prep.warmup_question}"</p>
+                      </div>
+                      {tutorContext.next_prep.suggested_vocabulary && (
+                        <div className="mt-2">
+                          <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Vocabulario sugerido</p>
+                          <p className="text-slate-300 text-[11px] leading-relaxed">{tutorContext.next_prep.suggested_vocabulary}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {/* BARRA COMPACTA DE LECCIÓN ACTUAL (cuando la grilla está colapsada) */}
             {!showLessonGrid && data && (
               <div className="bg-slate-800/80 p-4 rounded-2xl border border-blue-500/30 flex items-center justify-between gap-3 lesson-change-flash">
