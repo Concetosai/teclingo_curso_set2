@@ -5,6 +5,7 @@ export interface TutorState {
   streak_days: number;
   total_time_minutes: number;
   last_completed_date: string | null;
+  preferred_voice_gender: 'female' | 'male';
 }
 
 export interface NextPrep {

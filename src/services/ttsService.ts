@@ -1,6 +1,15 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 let currentAudio: HTMLAudioElement | null = null;
+let preferredGender: 'female' | 'male' = 'female';
+
+export function setVoiceGender(gender: 'female' | 'male'): void {
+  preferredGender = gender;
+}
+
+export function getVoiceGender(): 'female' | 'male' {
+  return preferredGender;
+}
 
 function isDialogue(text: string): boolean {
   return /\b[A-H]\s*:\s*/i.test(text);
@@ -122,10 +131,17 @@ function speakDialogue(
   text: string,
   opts?: { rate?: number; onStart?: () => void; onEnd?: () => void; onError?: () => void }
 ): void {
+  const voices: Record<string, string> = {
+    female: 'en-US-AriaNeural',
+    male: 'en-US-GuyNeural',
+  };
+  const femaleVoice = voices[preferredGender] || voices.female;
+  const maleVoice = preferredGender === 'female' ? voices.male : voices.female;
+
   fetch(`${API_BASE}/api/tts-dialogue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, rate: '+0%' }),
+    body: JSON.stringify({ text, rate: '+0%', female_voice: femaleVoice, male_voice: maleVoice }),
   })
     .then((res) => {
       if (!res.ok) throw new Error('TTS dialogue API error');
@@ -183,6 +199,10 @@ function fallbackSpeak(
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
   u.rate = opts?.rate ?? 0.92;
+  const voices = window.speechSynthesis.getVoices();
+  const genderPrefix = preferredGender === 'female' ? 'female' : 'male';
+  const match = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes(genderPrefix));
+  if (match) u.voice = match;
   u.onstart = () => opts?.onStart?.();
   u.onend = () => opts?.onEnd?.();
   u.onerror = () => opts?.onError?.();

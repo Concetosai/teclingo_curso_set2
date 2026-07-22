@@ -20,7 +20,7 @@ import { loginConGoogle, logout, obtenerUsuarioActual } from './services/authSer
 import { saveProgress, saveActivity, logEntrada, logSalida } from './services/sheetsService'
 import { cargarEstadoTutor, type TutorContext } from './services/tutorService'
 import { useLastSession } from './hooks/useLastSession'
-import { speak as ttsSpeak, stop as ttsStop, pause as ttsPause, resume as ttsResume, isPlaying as ttsIsPlaying, isPaused as ttsIsPaused } from './services/ttsService'
+import { speak as ttsSpeak, stop as ttsStop, pause as ttsPause, resume as ttsResume, isPlaying as ttsIsPlaying, isPaused as ttsIsPaused, setVoiceGender } from './services/ttsService'
 
 interface SubtopicData {
   title: string;
@@ -554,6 +554,9 @@ function App() {
     setLoadingTutor(true);
     cargarEstadoTutor(userId).then(ctx => {
       setTutorContext(ctx);
+      if (ctx?.state.preferred_voice_gender) {
+        setVoiceGender(ctx.state.preferred_voice_gender);
+      }
       setLoadingTutor(false);
     }).catch(() => setLoadingTutor(false));
   }, [user, userId]);
