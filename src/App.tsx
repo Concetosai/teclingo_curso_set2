@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './index.css'
+import { useTheme } from './hooks/useTheme'
+import ThemeToggle from './components/ThemeToggle'
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 import UnscrambleExercise from './components/UnscrambleExercise'
@@ -76,6 +78,7 @@ function extractSpokenPhrase(prompt: string): string {
 }
 
 function App() {
+  const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState<any>(() => obtenerUsuarioActual());
   const [loggingIn, setLoggingIn] = useState(false);
   const [subtopicsList, setSubtopicsList] = useState<SubtopicMenu[]>([]);
@@ -130,6 +133,8 @@ function App() {
   const [showCertAlert, setShowCertAlert] = useState(false);
   const [showTrialMode, setShowTrialMode] = useState(false);
   const isGuest = user?.email?.includes('teclingo.local') || false;
+  const isDemoUser = user?.email === 'demo@teclingo.local' || localStorage.getItem('teclingo_demo_mode') === 'true';
+  const DEMO_LESSONS_LIMIT = 3;
   const recRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const lessonContentRef = useRef<HTMLDivElement>(null);
@@ -473,6 +478,22 @@ function App() {
   }, [currentSubtopicId]);
 
   useEffect(() => {
+    const setVH = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+    setVH();
+    window.addEventListener('resize', setVH);
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'hidden';
+    return () => {
+      window.removeEventListener('resize', setVH);
+      document.body.style.overflowX = '';
+      document.documentElement.style.overflowX = '';
+    };
+  }, []);
+
+  useEffect(() => {
     if (!showScrollHint || !skillsRef.current) return;
     const observer = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) setShowScrollHint(false); },
@@ -527,90 +548,87 @@ function App() {
   // =============================================
   if (showTrialMode && !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Fondo decorativo */}
+      <div className="min-h-[100dvh] min-h-[calc(var(--vh,1vh)*100)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col justify-center p-3 relative overflow-hidden">
+        <ThemeToggle theme={theme} onToggle={toggleTheme} variant="login" />
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-lime-500/5 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{backgroundImage: 'linear-gradient(rgba(132,204,22,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(132,204,22,0.3) 1px, transparent 1px)', backgroundSize: '60px 60px'}}></div>
 
-        <div className="relative z-10 w-full max-w-md animate-in fade-in duration-500">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/20 mb-4">
+        <div className="relative z-10 w-full max-w-md mx-auto animate-in fade-in duration-500 flex flex-col">
+          {/* Header — compacto */}
+          <div className="text-center mb-3">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-lime-500/10 border border-lime-500/20 mb-2">
               <span className="w-1.5 h-1.5 rounded-full bg-lime-400 animate-pulse"></span>
-              <span className="text-[10px] font-mono tracking-widest text-lime-400 uppercase">Modo Prueba Activo</span>
+              <span className="text-[9px] font-mono tracking-widest text-lime-400 uppercase">Modo Prueba Activo</span>
             </div>
-            <h1 className="text-3xl font-black text-white mb-2">
+            <h1 className="text-xl font-black text-white mb-1">
               Elige tu <span className="text-lime-400">experiencia</span>
             </h1>
-            <p className="text-slate-400 text-sm font-light">
+            <p className="text-slate-400 text-[11px] font-light">
               Explora sin registro. Descubre cómo TECLINGO puede entrenar tu cerebro.
             </p>
           </div>
 
-          {/* Tarjetas de experiencia */}
-          <div className="space-y-4">
-            {/* Opción 1: Herramientas IA — abre teclingoingles.com en nueva pestaña */}
+          {/* Tarjetas — compactas */}
+          <div className="space-y-2">
+            {/* IA */}
             <button
               onClick={() => window.open('https://www.teclingoingles.com', '_blank')}
-              className="group w-full text-left p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-lime-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-lime-500/5 hover:bg-slate-800/80"
+              className="group w-full text-left p-3 rounded-xl bg-slate-900/80 border border-slate-800/80 hover:border-lime-500/30 transition-all duration-300"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-lime-500/10 border border-lime-500/20 flex items-center justify-center text-lg flex-shrink-0">
                   🤖
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-bold text-base mb-1 group-hover:text-lime-400 transition-colors">
-                    Probar Herramientas IA
-                  </h3>
-                  <p className="text-slate-400 text-[11px] leading-relaxed">
-                    Ejercicios interactivos de grammar, vocabulary, speaking y más. Evaluación automática con inteligencia artificial.
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[8px] font-mono text-slate-400 uppercase border border-slate-700/50">Grammar</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[8px] font-mono text-slate-400 uppercase border border-slate-700/50">Vocabulary</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[8px] font-mono text-slate-400 uppercase border border-slate-700/50">Speaking</span>
-                    <span className="px-2 py-0.5 rounded-full bg-lime-500/10 text-[8px] font-mono text-lime-400 uppercase border border-lime-500/20">IA</span>
+                  <h3 className="text-white font-bold text-[13px] leading-tight group-hover:text-lime-400 transition-colors">Probar Herramientas IA</h3>
+                  <p className="text-slate-400 text-[10px] leading-snug mt-0.5">Grammar, vocabulary, speaking y más. Evaluación automática con IA.</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase border border-slate-700/50">Grammar</span>
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase border border-slate-700/50">Vocabulary</span>
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase border border-slate-700/50">Speaking</span>
+                    <span className="px-1.5 py-[1px] rounded-full bg-lime-500/10 text-[7px] font-mono text-lime-400 uppercase border border-lime-500/20">IA</span>
                   </div>
                 </div>
-                <div className="flex flex-col items-end flex-shrink-0">
-                  <span className="text-slate-600 group-hover:text-lime-400 transition-colors text-xl">→</span>
-                  <span className="text-[8px] text-slate-600 font-mono mt-1">nueva pestaña</span>
+                <div className="flex flex-col items-center flex-shrink-0 gap-0.5">
+                  <span className="text-slate-600 group-hover:text-lime-400 transition-colors text-sm">→</span>
+                  <span className="text-[7px] text-slate-600 font-mono">pestaña</span>
                 </div>
               </div>
             </button>
 
-            {/* Opción 2: Curso Express */}
+            {/* Curso Express — Demo */}
             <button
               onClick={() => {
-                const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
-                setUser(mockUser);
-                localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
+                const demoUser = { email: 'demo@teclingo.local', nombre: 'Usuario Demo' };
+                setUser(demoUser);
+                localStorage.setItem('teclingo_mock_user', JSON.stringify(demoUser));
+                localStorage.setItem('teclingo_demo_mode', 'true');
+                setCurrentSubtopicId('A1-M01-ST01');
+                setActiveTab('lesson');
               }}
-              className="group w-full text-left p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-lime-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-lime-500/5 hover:bg-slate-800/80"
+              className="group w-full text-left p-3 rounded-xl bg-slate-900/80 border border-slate-800/80 hover:border-emerald-500/30 transition-all duration-300"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg flex-shrink-0">
                   📚
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-bold text-base mb-1 group-hover:text-emerald-400 transition-colors">
-                    Curso Express (3 lecciones)
-                  </h3>
-                  <p className="text-slate-400 text-xs leading-relaxed">
-                    Subject Pronouns, Verb To Be y Negatives. Teoría + ejercicios + vocabulario con adaptación por intereses.
-                  </p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">A1 Level</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">3 lecciones</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">Progreso</span>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-white font-bold text-[13px] leading-tight group-hover:text-emerald-400 transition-colors">Curso Express</h3>
+                    <span className="px-1.5 py-[1px] bg-amber-500/20 text-amber-400 text-[7px] font-bold uppercase rounded-full border border-amber-500/30">Demo</span>
+                  </div>
+                  <p className="text-slate-400 text-[10px] leading-snug mt-0.5">3 lecciones: Pronouns, Verb To Be, Negatives. Teoría + ejercicios.</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase">A1</span>
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase">3 lecciones</span>
+                    <span className="px-1.5 py-[1px] rounded-full bg-amber-500/10 text-[7px] font-mono text-amber-400 uppercase border border-amber-500/20">Limitado</span>
                   </div>
                 </div>
-                <span className="text-slate-600 group-hover:text-emerald-400 transition-colors text-xl">→</span>
+                <span className="text-slate-600 group-hover:text-emerald-400 transition-colors text-sm flex-shrink-0">→</span>
               </div>
             </button>
 
-            {/* Opción 3: ADN Digital — abre OnboardingFlow */}
+            {/* ADN Digital */}
             <button
               onClick={() => {
                 const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
@@ -618,35 +636,31 @@ function App() {
                 localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
                 setShowOnboardingManual(true);
               }}
-              className="group w-full text-left p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-violet-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-violet-500/5 hover:bg-slate-800/80"
+              className="group w-full text-left p-3 rounded-xl bg-slate-900/80 border border-slate-800/80 hover:border-violet-500/30 transition-all duration-300"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-lg flex-shrink-0">
                   🧬
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-bold text-base mb-1 group-hover:text-violet-400 transition-colors">
-                    Descubre tu ADN Digital
-                  </h3>
-                  <p className="text-slate-400 text-xs leading-relaxed">
-                    Onboarding interactivo: descubre tu perfil de aprendizaje, motivación, estilo y horario ideal. 14 pasos personalizados.
-                  </p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">ADN</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">14 pasos</span>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800/60 text-[9px] font-mono text-slate-400 uppercase">Videos</span>
+                  <h3 className="text-white font-bold text-[13px] leading-tight group-hover:text-violet-400 transition-colors">Descubre tu ADN Digital</h3>
+                  <p className="text-slate-400 text-[10px] leading-snug mt-0.5">Perfil de aprendizaje, motivación, estilo y horario. 14 pasos.</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase">ADN</span>
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase">14 pasos</span>
+                    <span className="px-1.5 py-[1px] rounded-full bg-slate-800/60 text-[7px] font-mono text-slate-400 uppercase">Videos</span>
                   </div>
                 </div>
-                <span className="text-slate-600 group-hover:text-violet-400 transition-colors text-xl">→</span>
+                <span className="text-slate-600 group-hover:text-violet-400 transition-colors text-sm flex-shrink-0">→</span>
               </div>
             </button>
           </div>
 
           {/* Botón volver */}
-          <div className="mt-8 text-center">
+          <div className="mt-3 text-center">
             <button
               onClick={() => setShowTrialMode(false)}
-              className="text-slate-500 hover:text-white text-xs font-medium transition-colors"
+              className="text-slate-500 hover:text-white text-[10px] font-medium transition-colors"
             >
               ← Volver a opciones de acceso
             </button>
@@ -658,78 +672,68 @@ function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-[100dvh] min-h-[calc(var(--vh,1vh)*100)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-3 relative overflow-hidden">
+        <ThemeToggle theme={theme} onToggle={toggleTheme} variant="login" />
         {/* Fondo decorativo */}
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-lime-500/5 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[300px] h-[300px] bg-lime-400/3 rounded-full blur-3xl pointer-events-none"></div>
 
-        {/* Grid de fondo sutil */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{backgroundImage: 'linear-gradient(rgba(132,204,22,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(132,204,22,0.3) 1px, transparent 1px)', backgroundSize: '60px 60px'}}></div>
-
-        <div className="relative z-10 w-full max-w-md">
+        <div className="relative z-10 w-full max-w-md flex flex-col items-center">
           {/* Card principal */}
-          <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-800/80 overflow-hidden">
+          <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-800/80 overflow-hidden w-full">
             
             {/* Header con logo */}
-            <div className="relative px-8 pt-10 pb-6 text-center">
-              {/* Badge animado */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/20 mb-5">
-                <span className="w-1.5 h-1.5 rounded-full bg-lime-400 animate-pulse"></span>
-                <span className="text-[10px] font-mono tracking-widest text-lime-400 uppercase">Coach IA Activo</span>
+            <div className="relative px-5 pt-6 pb-3 flex flex-col items-center">
+              {/* Logo — compacto */}
+              <div className="w-[72px] h-[72px] rounded-2xl shadow-xl shadow-lime-500/10 mb-2 overflow-hidden bg-slate-800/50 border border-slate-700/50 flex items-center justify-center">
+                <img src="/assets/images/mascotas/teclingo_main_logo.webp" alt="Logo TECLINGO" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
 
-              {/* Logo */}
-              <div className="inline-flex items-center justify-center w-36 h-36 rounded-3xl shadow-xl shadow-lime-500/10 mb-5 overflow-hidden bg-slate-800/50 border border-slate-700/50">
-                <img src="/assets/images/mascotas/teclingo_main_logo.webp" alt="Logo TECLINGO" className="w-full h-full object-contain" />
+              {/* Badge animado */}
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-lime-500/10 border border-lime-500/20 mb-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-lime-400 animate-pulse"></span>
+                <span className="text-[9px] font-mono tracking-widest text-lime-400 uppercase">Coach IA Activo</span>
               </div>
 
               {/* Título */}
-              <h1 className="text-3xl font-black tracking-tight text-white leading-tight mb-2">
+              <h1 className="text-xl font-black tracking-tight text-white leading-tight mb-1">
                 Tu coach personal<br/>
                 <span className="text-lime-400">para hablar inglés.</span>
               </h1>
 
               {/* Subtítulo */}
-              <p className="text-slate-400 text-sm font-light leading-relaxed max-w-xs mx-auto">
+              <p className="text-slate-400 text-[11px] font-light leading-snug max-w-[260px] text-center">
                 Entrena tu cerebro con sesiones diarias de IA.
-                <br/>
-                <span className="text-lime-400/80 font-medium">7 días de prueba.</span> Sin compromiso. Sin tarjeta.
+                <span className="text-lime-400/80 font-medium"> 7 días gratis.</span> Sin tarjeta.
               </p>
 
-              {/* Badges de confianza */}
-              <div className="flex flex-wrap justify-center gap-2 mt-5">
-                <span className="px-3 py-1 rounded-full border border-slate-700/60 text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                  🧠 Neuroplasticidad
-                </span>
-                <span className="px-3 py-1 rounded-full border border-slate-700/60 text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                  ⚡ 5 min/día
-                </span>
-                <span className="px-3 py-1 rounded-full border border-slate-700/60 text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                  📈 Progreso real
-                </span>
+              {/* Badges de confianza — compactos */}
+              <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                <span className="px-2 py-0.5 rounded-full border border-slate-700/60 text-[8px] font-mono uppercase text-slate-400">🧠 Neuroplasticidad</span>
+                <span className="px-2 py-0.5 rounded-full border border-slate-700/60 text-[8px] font-mono uppercase text-slate-400">⚡ 5 min/día</span>
+                <span className="px-2 py-0.5 rounded-full border border-slate-700/60 text-[8px] font-mono uppercase text-slate-400">📈 Progreso real</span>
               </div>
             </div>
 
-            {/* Botones de acción */}
-            <div className="px-8 pb-8 space-y-3">
-              {/* Botón principal — Prueba gratuita */}
+            {/* Botones de acción — compactos */}
+            <div className="px-5 pb-4 space-y-2">
+              {/* Botón principal */}
               <button
                 onClick={() => setShowTrialMode(true)}
-                className="group relative w-full py-4 bg-lime-400 hover:bg-lime-300 text-slate-950 rounded-xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg shadow-lime-500/20 hover:shadow-lime-400/30 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                className="group relative w-full py-3 bg-lime-400 hover:bg-lime-300 text-slate-950 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-lg shadow-lime-500/20 hover:shadow-lime-400/30 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
               >
                 <span className="absolute inset-0 rounded-xl overflow-hidden">
                   <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></span>
                 </span>
-                <span className="text-lg">🚀</span>
+                <span className="text-base">🚀</span>
                 Comienza tu prueba gratuita
-                <span className="text-sm opacity-70">→</span>
+                <span className="text-xs opacity-70">→</span>
               </button>
 
               {/* Separador */}
-              <div className="flex items-center gap-3 py-1">
+              <div className="flex items-center gap-2 py-0.5">
                 <div className="flex-1 h-px bg-slate-700/50"></div>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600">O accede con</span>
+                <span className="text-[8px] font-mono uppercase tracking-widest text-slate-600">O accede con</span>
                 <div className="flex-1 h-px bg-slate-700/50"></div>
               </div>
 
@@ -737,7 +741,7 @@ function App() {
               <button
                 onClick={handleLogin}
                 disabled={loggingIn}
-                className="w-full py-3 bg-slate-800/60 border border-slate-700/60 text-white text-xs font-medium rounded-xl hover:bg-slate-700/60 hover:border-slate-600 transition-all duration-300 flex items-center justify-center gap-2.5 cursor-pointer"
+                className="w-full py-2.5 bg-slate-800/60 border border-slate-700/60 text-white text-[11px] font-medium rounded-xl hover:bg-slate-700/60 hover:border-slate-600 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -748,55 +752,53 @@ function App() {
                 Continuar con Google
               </button>
 
-              {/* Botón secundario — Modo prueba */}
-              <button
-                onClick={() => {
-                  const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
-                  setUser(mockUser);
-                  localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
-                }}
-                className="w-full py-3 bg-slate-800/40 border border-slate-700/40 text-slate-300 text-xs font-medium rounded-xl hover:bg-slate-700/40 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                🧪 Entrar como usuario de prueba
-              </button>
-
-              {/* Social Proof */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-800/60">
-                <div className="flex items-center gap-2">
-                  <div className="flex -space-x-2">
+              {/* Social Proof — compacto inline */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                <div className="flex items-center gap-1.5">
+                  <div className="flex -space-x-1.5">
                     {[1,2,3].map((i) => (
-                      <div key={i} className="w-6 h-6 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[8px] text-white font-mono">
+                      <div key={i} className="w-5 h-5 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[7px] text-white font-mono">
                         {String.fromCharCode(64 + i)}
                       </div>
                     ))}
                   </div>
-                  <span className="text-[11px] text-slate-400 font-light">
+                  <span className="text-[9px] text-slate-400">
                     <span className="text-lime-400 font-medium">2,500+</span> estudiantes
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <div className="flex text-lime-400 text-[11px]">
-                    {"★★★★★"}
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-mono">4.9/5</span>
+                <div className="flex items-center gap-0.5">
+                  <div className="flex text-lime-400 text-[9px]">★★★★★</div>
+                  <span className="text-[8px] text-slate-500 font-mono">4.9/5</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Beneficios abajo */}
-          <div className="grid grid-cols-3 gap-3 mt-6 px-2">
+          {/* Features grid — compacto fuera del card */}
+          <div className="grid grid-cols-3 gap-2 mt-3 w-full px-1">
             {[
-              { icon: "🧠", title: "Entrenamiento\ncerebral", desc: "" },
-              { icon: "🎯", title: "Speaking\npráctico", desc: "" },
-              { icon: "📊", title: "Progreso\nmedible", desc: "" },
+              { icon: "🧠", title: "Entrenamiento\ncerebral" },
+              { icon: "🎯", title: "Speaking\npráctico" },
+              { icon: "📊", title: "Progreso\nmedible" },
             ].map((feature, i) => (
-              <div key={i} className="flex flex-col items-center text-center gap-1.5 p-3 rounded-xl bg-slate-900/40 border border-slate-800/40">
-                <span className="text-xl">{feature.icon}</span>
-                <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider whitespace-pre-line leading-tight">{feature.title}</span>
+              <div key={i} className="flex flex-col items-center text-center gap-1 p-2 rounded-xl bg-slate-900/40 border border-slate-800/40">
+                <span className="text-lg">{feature.icon}</span>
+                <span className="text-[9px] font-semibold text-slate-300 uppercase tracking-wider whitespace-pre-line leading-tight">{feature.title}</span>
               </div>
             ))}
           </div>
+
+          {/* Botón DEV — fuera del viewport, accesible al final del scroll */}
+          <button
+            onClick={() => {
+              const mockUser = { email: 'estudiante@teclingo.local', nombre: 'Estudiante de Prueba' };
+              setUser(mockUser);
+              localStorage.setItem('teclingo_mock_user', JSON.stringify(mockUser));
+            }}
+            className="mt-6 py-2 px-4 bg-transparent border border-slate-800/30 text-slate-700 text-[8px] font-mono uppercase tracking-widest hover:text-lime-400 hover:border-lime-500/30 transition-all duration-300 rounded-lg cursor-pointer"
+          >
+            🧪 DEV: modo prueba
+          </button>
         </div>
       </div>
     );
@@ -1004,14 +1006,16 @@ function App() {
     const scores = allFbs.filter(Boolean).map((r: any) => r.score || 0);
     const avgScore = scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0;
 
-    Promise.all([
-      fetch(`${API_BASE}/api/course/progress/save`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, subtopic_id: currentSubtopicId, skill, score: avgScore, attempts: skillAttemptsForSave, world: userContext.institutional_world })
-      }),
-      saveProgress({ subtopicId: currentSubtopicId, skill, score: avgScore, attempts: skillAttemptsForSave, world: userContext.institutional_world }),
-      saveActivity('evaluacion', `${skill} - ${currentSubtopicId} - score:${avgScore}`)
-    ]).catch(() => {});
+    if (!isDemoUser) {
+      Promise.all([
+        fetch(`${API_BASE}/api/course/progress/save`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, subtopic_id: currentSubtopicId, skill, score: avgScore, attempts: skillAttemptsForSave, world: userContext.institutional_world })
+        }),
+        saveProgress({ subtopicId: currentSubtopicId, skill, score: avgScore, attempts: skillAttemptsForSave, world: userContext.institutional_world }),
+        saveActivity('evaluacion', `${skill} - ${currentSubtopicId} - score:${avgScore}`)
+      ]).catch(() => {});
+    }
 
     if (fb.is_correct || fb.score >= 80 || newQAttempts >= 2) {
       setTimeout(() => {
@@ -1040,6 +1044,16 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
       <div className="max-w-5xl mx-auto p-4 md:p-8">
+        {isDemoUser && (
+          <div className="bg-amber-600/15 border border-amber-500/30 px-3 py-2 rounded-lg mb-3 flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-400 font-semibold">🧪 Modo Demo</span>
+              <span className="text-slate-500">|</span>
+              <span className="text-slate-400">Acceso limitado a 3 lecciones</span>
+            </div>
+            <button onClick={() => { localStorage.removeItem('teclingo_demo_mode'); localStorage.removeItem('teclingo_mock_user'); setUser(null); }} className="text-amber-400 hover:text-amber-300 underline font-medium transition-colors">Salir</button>
+          </div>
+        )}
         <header className="mb-6 header-border">
           <div className="header-bar">
             <div>
@@ -1058,16 +1072,7 @@ function App() {
               <button onClick={() => { setActiveTab('settings'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'settings' ? 'nav-active-purple' : 'nav-btn-inactive'}`}><span className="nav-icon">⚙️</span> Ajustes</button>
               <button onClick={() => { if (!isExamUnlocked) { setShowCertAlert(true); return; } setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`} title={!isExamUnlocked ? 'Completa todas las lecciones con promedio 70+ para desbloquear' : 'Ir al Examen A1'}><span className="nav-icon">{isExamUnlocked ? '📝' : '🔒'}</span> Examen</button>
               <button onClick={() => { setActiveTab('games'); setGameType(null); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'games' ? 'nav-active-pink' : 'nav-btn-inactive'}`}><span className="nav-icon">🎮</span> Juegos</button>
-              <button
-                onClick={openOnboarding}
-                className="nav-btn-3d relative overflow-hidden group bg-gradient-to-r from-pink-500 to-orange-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg hover:shadow-pink-500/50 transition-all duration-300 transform hover:scale-105"
-              >
-                <span className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></span>
-                <span className="flex items-center gap-2">
-                  <span className="text-xl">🧠</span>
-                  <span className="text-sm">Descubre tu ADN</span>
-                </span>
-              </button>
+              <ThemeToggle theme={theme} onToggle={toggleTheme} variant="header" />
               <button onClick={() => { handleLogout(); setNavOpen(false); }} className="nav-btn-3d nav-btn-logout">Salir</button>
             </div>
           </div>
@@ -1079,12 +1084,7 @@ function App() {
               <button onClick={() => { setActiveTab('settings'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'settings' ? 'nav-active-purple' : 'nav-btn-inactive'}`}><span className="nav-icon">⚙️</span> Ajustes</button>
               <button onClick={() => { if (!isExamUnlocked) { setShowCertAlert(true); return; } setActiveTab('exam'); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'exam' ? 'nav-active-amber' : 'nav-btn-inactive'}`} title={!isExamUnlocked ? 'Completa todas las lecciones con promedio 70+ para desbloquear' : 'Ir al Examen A1'}><span className="nav-icon">{isExamUnlocked ? '📝' : '🔒'}</span> Examen</button>
               <button onClick={() => { setActiveTab('games'); setGameType(null); setNavOpen(false); }} className={`nav-btn-3d ${activeTab === 'games' ? 'nav-active-pink' : 'nav-btn-inactive'}`}><span className="nav-icon">🎮</span> Juegos</button>
-              <button
-                onClick={() => { openOnboarding(); setNavOpen(false); }}
-                className="nav-btn-3d bg-gradient-to-r from-pink-500 to-orange-500 text-white font-bold col-span-2"
-              >
-                🧠 Descubre tu ADN
-              </button>
+              <ThemeToggle theme={theme} onToggle={toggleTheme} variant="header" />
               <button onClick={() => { handleLogout(); setNavOpen(false); }} className="nav-btn-3d nav-btn-logout" style={{ gridColumn: 'span 2' }}>Cerrar sesión</button>
             </div>
           </div>
@@ -1105,72 +1105,93 @@ function App() {
                 {!realProgress.a1_achieved && (
                   <div className="space-y-6">
 
-                    {/* === SECCION 1: Barra principal + stats === */}
-                    <div className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-700 p-6 rounded-2xl shadow-lg">
-                      <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">🗺️ Tu Camino hacia la Certificación A1</h3>
+                    {/* === SECCION 1: Tarjeta principal con progreso === */}
+                    <div className="panel-3d overflow-hidden">
+                      <div className="bg-gradient-to-r from-blue-900/60 to-indigo-900/60 p-6 md:p-8">
+                        {/* Header */}
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">🗺️ Tu Camino hacia la Certificación A1</h3>
+                            <p className="text-slate-400 text-sm">Módulos completados de 13 · {realProgress.overall_completion >= 100 ? '¡Listo para examen!' : 'Sigue avanzando'}</p>
+                          </div>
+                          <div className={`px-4 py-2 rounded-xl text-sm font-bold border ${realProgress.overall_completion >= 100 ? 'bg-green-900/30 border-green-500 text-green-400' : 'bg-blue-900/30 border-blue-500 text-blue-400'}`}>
+                            {realProgress.overall_completion >= 100 ? '🔓 Examen Desbloqueado' : `${Math.round(realProgress.overall_completion)}% para desbloquear examen`}
+                          </div>
+                        </div>
 
-                      {/* Barra Progreso Total */}
-                      <div className="mb-5">
-                        <div className="flex justify-between items-baseline mb-1.5">
-                          <span className="text-sm font-semibold text-slate-200">Progreso Total</span>
-                          <span className="text-lg font-bold text-blue-400">{realProgress.overall_completion}%</span>
-                        </div>
-                        <div className="w-full bg-slate-700 rounded-full h-5 relative overflow-visible">
-                          <div className="bg-gradient-to-r from-blue-600 to-indigo-500 h-5 rounded-full transition-all" style={{ width: `${Math.max(realProgress.overall_completion, 2)}%` }}></div>
-                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow-lg">{realProgress.overall_completion > 5 ? `${realProgress.overall_completion}%` : ''}</div>
-                          {/* Subtopic indicators */}
-                          {subtopicsList.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 z-20">
-                              <div className="flex gap-0.5 items-end">
-                                {subtopicsList.map((st, idx) => {
-                                  const totalLessons = subtopicsList.length;
-                                  const widthPct = totalLessons > 0 ? (100 / totalLessons) : 10;
-                                  const skills = ['grammar','vocabulary','reading','listening','writing','pronunciation'];
-                                  const hasProgress = skills.some(s => {
-                                    const sStats = realProgress.skill_stats?.[s];
-                                    return sStats && sStats.lessons_completed > 0 && st.sequence_order <= sStats.lessons_completed;
-                                  });
-                                  const isCompleted = st.sequence_order === lastLessonOrder || (realProgress.a1_skills_passed && Object.values(realProgress.a1_skills_passed).some(Boolean) && st.sequence_order <= 3);
-                                  let barColor = 'bg-slate-600';
-                                  if (isCompleted) barColor = 'bg-green-500';
-                                  else if (hasProgress) barColor = 'bg-amber-400';
-                                  return (
-                                    <div key={st.subtopic_id} className="group/bar relative flex flex-col items-center cursor-pointer" style={{ width: `${widthPct}%` }}>
-                                      <div className={`w-full h-2 rounded-sm ${barColor} transition-all group-hover/bar:h-3`} style={{ minHeight: '6px' }}></div>
-                                      <span className="text-[9px] text-slate-500 mt-0.5 leading-none group-hover/bar:text-white transition-colors">{idx + 1}</span>
-                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 pointer-events-none z-30 whitespace-nowrap">
-                                        <div className="bg-slate-800 border border-slate-600 text-white text-[10px] font-semibold px-2 py-1 rounded-lg shadow-lg">
-                                          <span className="text-blue-300">#{idx + 1}</span> {st.title}
-                                        </div>
-                                        <div className="w-2 h-2 bg-slate-800 border-b border-r border-slate-600 rotate-45 mx-auto -mt-1"></div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              <div className="flex gap-3 mt-1.5 justify-center">
-                                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>Completada</span>
-                                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>En progreso</span>
-                                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>Sin iniciar</span>
-                              </div>
+                        {/* Barra de progreso principal */}
+                        <div className="mb-2">
+                          <div className="flex justify-between items-baseline mb-2">
+                            <span className="text-sm font-semibold text-slate-300">Progreso Total</span>
+                            <span className="text-lg font-bold text-blue-400">{Math.min(realProgress.overall_completion, 100)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-700/80 rounded-full h-6 relative overflow-hidden">
+                            <div
+                              className="bg-gradient-to-r from-blue-500 to-indigo-400 h-6 rounded-full transition-all duration-700 ease-out relative"
+                              style={{ width: `${Math.min(Math.max(realProgress.overall_completion, 2), 100)}%` }}
+                            >
+                              <div className="absolute inset-0 bg-gradient-to-b from-white/15 to-transparent rounded-full"></div>
                             </div>
-                          )}
+                            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow-lg pointer-events-none">
+                              {realProgress.overall_completion > 5 ? `${Math.min(realProgress.overall_completion, 100)}%` : ''}
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Subtopicos como mini pasos */}
+                        {subtopicsList.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-blue-800/40">
+                            <div className="flex items-center gap-0.5">
+                              {subtopicsList.map((st, idx) => {
+                                const totalLessons = subtopicsList.length;
+                                const widthPct = totalLessons > 0 ? (100 / totalLessons) : 10;
+                                const skills = ['grammar','vocabulary','reading','listening','writing','pronunciation'];
+                                const hasProgress = skills.some(s => {
+                                  const sStats = realProgress.skill_stats?.[s];
+                                  return sStats && sStats.lessons_completed > 0 && st.sequence_order <= sStats.lessons_completed;
+                                });
+                                const isCompleted = st.sequence_order === lastLessonOrder || (realProgress.a1_skills_passed && Object.values(realProgress.a1_skills_passed).some(Boolean) && st.sequence_order <= 3);
+                                let barColor = 'bg-slate-600';
+                                if (isCompleted) barColor = 'bg-green-500';
+                                else if (hasProgress) barColor = 'bg-amber-400';
+                                return (
+                                  <div key={st.subtopic_id} className="group/step relative flex flex-col items-center cursor-pointer" style={{ width: `${widthPct}%` }}>
+                                    <div className={`w-full h-1.5 rounded-sm ${barColor} transition-all duration-200 group-hover/step:h-2.5 group-hover/step:shadow-lg`} style={{ minHeight: '4px' }}></div>
+                                    <span className="text-[9px] text-slate-500 mt-1 leading-none group-hover/step:text-blue-300 transition-colors font-medium">{idx + 1}</span>
+                                    {/* Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/step:opacity-100 transition-all duration-200 pointer-events-none z-30 whitespace-nowrap">
+                                      <div className="bg-slate-800 border border-slate-600 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xl">
+                                        <span className="text-blue-300">#{idx + 1}</span> {st.title}
+                                        {isCompleted && <span className="text-green-400 ml-1">✓</span>}
+                                      </div>
+                                      <div className="w-2 h-2 bg-slate-800 border-b border-r border-slate-600 rotate-45 mx-auto -mt-1"></div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex gap-4 mt-2 justify-center">
+                              <span className="flex items-center gap-1.5 text-[10px] text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>Completada</span>
+                              <span className="flex items-center gap-1.5 text-[10px] text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>En progreso</span>
+                              <span className="flex items-center gap-1.5 text-[10px] text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-slate-600 inline-block"></span>Sin iniciar</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* 3 mini stats */}
-                      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-blue-800/40">
-                        <div className="text-center">
+                      {/* 3 stats en fila inferior */}
+                      <div className="grid grid-cols-3 divide-x divide-slate-700/50 bg-slate-800/30">
+                        <div className="text-center py-4 px-3">
                           <p className="text-2xl font-bold text-white">{realProgress.overall_average}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">Promedio General</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider font-medium">Promedio General</p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-bold text-blue-300">{realProgress.total_entries}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">Ejercicios</p>
+                        <div className="text-center py-4 px-3">
+                          <p className="text-2xl font-bold text-blue-400">{realProgress.total_entries}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider font-medium">Ejercicios</p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-2xl font-bold text-indigo-300 capitalize">{(realProgress.world || userContext.institutional_world).replace('_', ' ')}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">Tu Mundo</p>
+                        <div className="text-center py-4 px-3">
+                          <p className="text-lg font-bold text-indigo-400 capitalize">{(realProgress.world || userContext.institutional_world).replace('_', ' ')}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider font-medium">Tu Mundo</p>
                         </div>
                       </div>
                     </div>
@@ -1320,6 +1341,7 @@ function App() {
 
         {activeTab === 'settings' && (
           <div className="space-y-8 animate-in fade-in duration-300">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} variant="settings" />
             <div className="panel-header-3d panel-header-blue p-6 space-y-4">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-3xl">🌎</span>
@@ -1487,8 +1509,10 @@ function App() {
                       exercises={grammarExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, true_false: score });
-                        saveProgress({ subtopicId: currentSubtopicId, skill: 'grammar', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
-                        saveActivity('juego', `true_false - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        if (!isDemoUser) {
+                          saveProgress({ subtopicId: currentSubtopicId, skill: 'grammar', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
+                          saveActivity('juego', `true_false - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        }
                       }}
                     />
                   )}
@@ -1497,8 +1521,10 @@ function App() {
                       exercises={vocabularyExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, flashcards: score });
-                        saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
-                        saveActivity('juego', `flashcards - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        if (!isDemoUser) {
+                          saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
+                          saveActivity('juego', `flashcards - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        }
                       }}
                     />
                   )}
@@ -1507,8 +1533,10 @@ function App() {
                       exercises={vocabularyExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, hangman: score });
-                        saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
-                        saveActivity('juego', `hangman - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        if (!isDemoUser) {
+                          saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
+                          saveActivity('juego', `hangman - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        }
                       }}
                     />
                   )}
@@ -1517,8 +1545,10 @@ function App() {
                       exercises={vocabularyExercises}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, drag_drop: score });
-                        saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
-                        saveActivity('juego', `drag_drop - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        if (!isDemoUser) {
+                          saveProgress({ subtopicId: currentSubtopicId, skill: 'vocabulary', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
+                          saveActivity('juego', `drag_drop - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        }
                       }}
                     />
                   )}
@@ -1529,8 +1559,10 @@ function App() {
                       timePerQuestion={15}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, timer_quiz: score });
-                        saveProgress({ subtopicId: currentSubtopicId, skill: gameSkill, score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
-                        saveActivity('juego', `timer_quiz - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        if (!isDemoUser) {
+                          saveProgress({ subtopicId: currentSubtopicId, skill: gameSkill, score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
+                          saveActivity('juego', `timer_quiz - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        }
                       }}
                     />
                   )}
@@ -1542,8 +1574,10 @@ function App() {
                       userContext={userContext}
                       onComplete={(score) => {
                         setGameResults({ ...gameResults, ai_conversation: score });
-                        saveProgress({ subtopicId: currentSubtopicId, skill: 'pronunciation', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
-                        saveActivity('juego', `ai_conversation - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        if (!isDemoUser) {
+                          saveProgress({ subtopicId: currentSubtopicId, skill: 'pronunciation', score, attempts: 1, world: userContext.institutional_world }).catch(() => {});
+                          saveActivity('juego', `ai_conversation - ${currentSubtopicId} - score:${score}`).catch(() => {});
+                        }
                       }}
                     />
                   )}
@@ -1639,7 +1673,14 @@ function App() {
                 </button>
               )}
               <div className="lesson-grid-3d">
+                {isDemoUser && subtopicsList.length > DEMO_LESSONS_LIMIT && (
+                  <div className="col-span-2 bg-amber-900/20 border border-amber-500/30 rounded-xl p-3 text-center mb-2">
+                    <p className="text-amber-400 text-xs font-semibold">🔒 Modo Demo: {DEMO_LESSONS_LIMIT} de {subtopicsList.length} lecciones disponibles</p>
+                    <p className="text-slate-500 text-[10px] mt-1">Crea una cuenta gratuita para acceder a todas las lecciones</p>
+                  </div>
+                )}
                 {subtopicsList && subtopicsList.length > 0 && subtopicsList.map((st) => {
+                  if (isDemoUser && st.sequence_order > DEMO_LESSONS_LIMIT) return null;
                   const isActive = currentSubtopicId === st.subtopic_id;
                   const isCompleted = st.sequence_order === lastLessonOrder || (currentSubtopicId === st.subtopic_id && allSkillsCompleted());
                   const btnClass = isActive ? 'lesson-btn-active' : isCompleted ? 'lesson-btn-completed' : 'lesson-btn-pending';
@@ -1798,13 +1839,32 @@ function App() {
                     <div className="flex flex-wrap gap-2 border-b border-slate-700 pb-3">
                       {skillLabels.map(s => (<button key={s.key} onClick={() => setSkillTab(s.key)} className={`px-3 py-2 rounded-lg text-sm font-medium ${skillTab === s.key ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{s.icon} {s.label}</button>))}
                     </div>
-                    <div className="relative">
+                    <div className="relative group">
                       {showHelpHint && (
-                        <div className="absolute -top-10 right-0 flex flex-col items-end gap-1 z-30 animate-bounce">
-                          <span className="text-amber-400 font-bold text-xs whitespace-nowrap bg-slate-800/90 px-2 py-1 rounded-lg border border-amber-500/30">Lee cómo funciona cada ejercicio</span>
-                          <svg className="w-6 h-6 text-amber-400 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                          </svg>
+                        <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto z-30">
+                          <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-700/60 rounded-lg shadow-lg p-3 min-w-[200px]">
+                            <p className="text-slate-300 text-xs mb-2 leading-relaxed">
+                              ¿Necesitas ayuda? Haz clic aquí para ver las instrucciones.
+                            </p>
+                            <label className="flex items-center gap-2 cursor-pointer group/checkbox">
+                              <input
+                                type="checkbox"
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    localStorage.setItem('teclingo_hide_help_hint', 'true');
+                                    setShowHelpHint(false);
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer"
+                              />
+                              <span className="text-slate-400 text-[10px] group-hover/checkbox:text-slate-300 transition-colors">
+                                No volver a mostrar
+                              </span>
+                            </label>
+                          </div>
+                          <div className="absolute top-full right-4 -mt-px">
+                            <div className="w-2 h-2 bg-slate-800/95 border-r border-b border-slate-700/60 rotate-45"></div>
+                          </div>
                         </div>
                       )}
                       <button 
