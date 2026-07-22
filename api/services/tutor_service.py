@@ -25,11 +25,19 @@ class TutorService:
 
         world = worlds_db.get(user_context.get("institutional_world", "tecnm"), worlds_db["tecnm"])
 
+        # 🆕 CAMBIO CLAVE 1: Incluir tipo de ejercicio y banco de palabras
         exercises_context = ""
         for i, ex in enumerate(exercises):
-            exercises_context += f"{i+1}. Question/Prompt: '{ex.get('question', '')}' | User Answer: '{ex.get('user_answer', '')}' | Expected: '{ex.get('correct_answer', '')}'\n"
+            ex_type = ex.get('type', 'unknown')
+            words_bank = ex.get('words', [])
+            exercises_context += f"{i+1}. Type: '{ex_type}' | Question/Prompt: '{ex.get('question', '')}' | User Answer: '{ex.get('user_answer', '')}' | Expected: '{ex.get('correct_answer', '')}'"
+            if ex_type == 'unscramble' and words_bank:
+                exercises_context += f" | Word Bank: {words_bank} (user MUST use ONLY these words, nothing more, nothing less)"
+            exercises_context += "\n"
 
+        # 🆕 CAMBIO CLAVE 2: System prompt con Regla #16 anti-alucinación
         system_prompt = f"""You are an expert instructional designer and empathetic English tutor for Spanish-speaking students.
+
 You are currently teaching a student with the following INSTITUTIONAL PROFILE:
 - Country/City: {user_context.get('country', 'México')}, {user_context.get('city', 'Ciudad de México')}
 - Institution/Context: {world['name']}
@@ -39,10 +47,10 @@ You are currently teaching a student with the following INSTITUTIONAL PROFILE:
 - CEFR Level: A1
 
 CRITICAL PEDAGOGICAL RULES:
-1. STRICT CONTEXTUALIZATION: You MUST use the characters, places, and scenarios provided above.
+1. STRICT CONTEXTUALIZATION: You MUST use the characters, places, and scenarios provided above (EXCEPT for unscramble exercises - see rule #16).
 2. LANGUAGE: Your 'summary', 'feedback', and 'pedagogical_reason' MUST BE IN SPANISH.
-3. GRAMMAR SCOPE: Strictly use ONLY A1 grammar (Verb To Be, Subject Pronouns, Possessive Adjectives, Basic Prepositions, Present Simple for routines).
-4. SPEAKING/PRONUNCIATION TOLERANCE: NEVER penalize for exact string matching. IGNORE instructional words like "Say:", "Graba:", "Answer:". Evaluate based on PHONETIC SIMILARITY and CORE MEANING.
+3. GRAMMAR SCOPE: Strictly use ONLY A1 grammar.
+4. SPEAKING/PRONUNCIATION TOLERANCE: NEVER penalize for exact string matching. Evaluate based on PHONETIC SIMILARITY and CORE MEANING.
 5. "I DON'T KNOW": If the user writes "no sé", gently encourage them to try.
 6. PEDAGOGICAL REASON: Base your 'pedagogical_reason' on strict A1 rules explained in Spanish.
 7. *** ABSOLUTELY CRITICAL - THE 'feedback' FIELD MUST NEVER CONTAIN THE CORRECT ANSWER WORD ***
@@ -54,6 +62,15 @@ CRITICAL PEDAGOGICAL RULES:
 13. CAPITALIZATION IN SPEAKING: Be lenient with capitalization in spoken responses.
 14. PROMPT READING DETECTION: If the user's answer is EXACTLY the same as the prompt, score it 0.
 15. EVERYDAY vs EVERY DAY: Accept BOTH forms.
+16. *** ABSOLUTELY CRITICAL - UNSCRAMBLE EXERCISES (Type: 'unscramble') ***
+    - These exercises provide a "Word Bank" with EXACTLY the words the user must use.
+    - Evaluate ONLY if the user formed a grammatically correct sentence using EXACTLY the words from the Word Bank.
+    - DO NOT require additional words like institution names, places, or context if those words are NOT in the Word Bank.
+    - If the user used ALL words from the bank in a grammatically correct order, give FULL CREDIT (100/100).
+    - NEVER penalize or give partial credit if the user correctly ordered the words but didn't add extra context words.
+    - NEVER tell the user they need to "specify" or "add" information that is already present in their answer.
+    - Example: If Word Bank is ["The", "book", "is", "on", "the", "table"] and user writes "The book is on the table", give 100/100. DO NOT say "you need to specify where the book is" because "on the table" already specifies it.
+    - Example: If Word Bank is ["I", "am", "a", "student"] and user writes "I am a student", give 100/100 even if institutional context suggests adding "at Tecnológico Nacional de México".
 
 Return a JSON object with this EXACT structure:
 {{

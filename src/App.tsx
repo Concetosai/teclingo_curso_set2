@@ -549,7 +549,6 @@ function App() {
   if (showTrialMode && !user) {
     return (
       <div className="min-h-[100dvh] min-h-[calc(var(--vh,1vh)*100)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col justify-center p-3 relative overflow-hidden">
-        <ThemeToggle theme={theme} onToggle={toggleTheme} variant="login" />
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-lime-500/5 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -673,7 +672,6 @@ function App() {
   if (!user) {
     return (
       <div className="min-h-[100dvh] min-h-[calc(var(--vh,1vh)*100)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-3 relative overflow-hidden">
-        <ThemeToggle theme={theme} onToggle={toggleTheme} variant="login" />
         {/* Fondo decorativo */}
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-lime-500/5 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
